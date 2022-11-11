@@ -193,7 +193,6 @@ div.csl-indent {
   <li><a href="#data-dictionary" id="toc-data-dictionary" class="nav-link" data-scroll-target="#data-dictionary">Data dictionary:</a></li>
   <li><a href="#data-exploration" id="toc-data-exploration" class="nav-link" data-scroll-target="#data-exploration">Data exploration:</a></li>
   <li><a href="#plots" id="toc-plots" class="nav-link" data-scroll-target="#plots">Plots</a></li>
-  <li><a href="#references" id="toc-references" class="nav-link" data-scroll-target="#references">References</a></li>
   </ul>
 </nav>
     </div>
@@ -217,7 +216,7 @@ div.csl-indent {
 
 </header>
 
-<p><img src="palmerpens.png" class="img-fluid"></p>
+<p><img src="palmerpens.png" class="img-fluid"> <span class="citation" data-cites="Palmerpenguins">(<a href="#ref-Palmerpenguins" role="doc-biblioref"><span>“Introduction to Palmerpenguins”</span> n.d.</a>)</span></p>
 <section id="objective" class="level3">
 <h3 class="anchored" data-anchor-id="objective">Objective</h3>
 <p>The goal of the analysis is to describe variability in penguin body mass per the palmer penguins data set.</p>
@@ -229,6 +228,7 @@ div.csl-indent {
 <h3 class="anchored" data-anchor-id="data-dictionary">Data dictionary:</h3>
 <p>Can be accessed at this link:</p>
 <p>https://github.com/rfordatascience/tidytuesday/blob/master/data/2020/2020-07-28/readme.md</p>
+<p><span class="citation" data-cites="dictionary">(<a href="#ref-dictionary" role="doc-biblioref"><em><span>DataSets</span></em> 2022</a>)</span></p>
 </section>
 <section id="data-exploration" class="level3">
 <h3 class="anchored" data-anchor-id="data-exploration">Data exploration:</h3>
@@ -283,6 +283,7 @@ Note
 </section>
 <section id="plots" class="level3 page-columns page-full">
 <h3 class="anchored" data-anchor-id="plots">Plots</h3>
+<p><span class="citation" data-cites="ggplot">(<a href="#ref-ggplot" role="doc-biblioref"><span>“Create Elegant Data Visualisations Using the Grammar of Graphics”</span> n.d.</a>)</span></p>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>penguins_data <span class="sc">%&gt;%</span> </span>
 <span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(Species, Sex) <span class="sc">%&gt;%</span></span>
@@ -332,7 +333,7 @@ Note
 <p><img src="Example_analysis_files/figure-html/unnamed-chunk-16-1.png" class="img-fluid" width="672"></p>
 </div>
 </div>
-<p>Linear regression with body mass in lbs as dependent variable and sex as independent variable</p>
+<p>Linear regression with body mass in lbs as dependent variable and sex as independent variable <span class="citation" data-cites="linear_regression">(<a href="#ref-linear_regression" role="doc-biblioref"><span>“R Linear Regression Tutorial: Lm Function in r with Code Examples”</span> n.d.</a>)</span></p>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb8"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>uni_sex <span class="ot">=</span> <span class="fu">lm</span>(<span class="st">`</span><span class="at">Body Mass (lbs)</span><span class="st">`</span> <span class="sc">~</span> Sex, <span class="at">data=</span>penguins_data)</span>
 <span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a></span>
@@ -379,16 +380,21 @@ Note
 <div class="cell">
 <div class="sourceCode cell-code" id="cb10"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>knitr<span class="sc">::</span><span class="fu">write_bib</span>(<span class="st">"rmarkdown"</span>, <span class="at">file =</span> <span class="st">"my-refs.bib"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
-</section>
-<section id="references" class="level2">
-<h2 class="anchored" data-anchor-id="references">References</h2>
-<p><span class="citation" data-cites="linear_regression">(<a href="#ref-linear_regression" role="doc-biblioref"><span>“R Linear Regression Tutorial: Lm Function in r with Code Examples”</span> n.d.</a>)</span></p>
 
 
 
 </section>
 
 <div id="quarto-appendix" class="default"><section class="quarto-appendix-contents" role="doc-bibliography"><h2 class="anchored quarto-appendix-heading">References</h2><div id="refs" class="references csl-bib-body hanging-indent" role="doc-bibliography">
+<div id="ref-ggplot" class="csl-entry" role="doc-biblioentry">
+<span>“Create Elegant Data Visualisations Using the Grammar of Graphics.”</span> n.d. Accessed November 10, 2022. <a href="https://ggplot2.tidyverse.org/">https://ggplot2.tidyverse.org/</a>.
+</div>
+<div id="ref-dictionary" class="csl-entry" role="doc-biblioentry">
+<em><span>DataSets</span></em>. 2022. R for Data Science Online Learning Community. <a href="https://github.com/rfordatascience/tidytuesday/blob/840f418efda3ee1a39c1d1e24bf23bc083a5b7e5/data/2020/2020-07-28/readme.md">https://github.com/rfordatascience/tidytuesday/blob/840f418efda3ee1a39c1d1e24bf23bc083a5b7e5/data/2020/2020-07-28/readme.md</a>.
+</div>
+<div id="ref-Palmerpenguins" class="csl-entry" role="doc-biblioentry">
+<span>“Introduction to Palmerpenguins.”</span> n.d. Accessed November 10, 2022. <a href="https://allisonhorst.github.io/palmerpenguins/articles/intro.html">https://allisonhorst.github.io/palmerpenguins/articles/intro.html</a>.
+</div>
 <div id="ref-linear_regression" class="csl-entry" role="doc-biblioentry">
 <span>“R Linear Regression Tutorial: Lm Function in r with Code Examples.”</span> n.d. Accessed November 10, 2022. <a href="https://www.datacamp.com/tutorial/linear-regression-R">https://www.datacamp.com/tutorial/linear-regression-R</a>.
 </div>
