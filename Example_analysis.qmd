@@ -1,7 +1,7 @@
 ---
 title: "Example Analysis"
 editor: visual
-bibliography: my-refs.bib
+bibliography: refs.bib
 
 ---
 
@@ -25,6 +25,8 @@ https://github.com/rfordatascience/tidytuesday/blob/master/data/2020/2020-07-28/
 library(tidyverse)
 library(ggplot2)
 library(palmerpenguins)
+library(RefManageR)
+library(bibtex)
 ```
 
 :::{.callout-note}
@@ -137,7 +139,7 @@ knitr::write_bib("rmarkdown", file = "my-refs.bib")
 
 ## References
 
-
+[@linear_regression] 
 
 
 
