@@ -1,0 +1,39 @@
+---
+title: "Stat_programming_HW1"
+format: html
+editor: visual
+---
+
+Test PATH for bash, if ls doesnt work then update PATH
+
+```{bash}
+#ls
+```
+
+```{r}
+
+#Sys.getenv("PATH")
+
+#old_path <- Sys.getenv("PATH")
+
+#Sys.setenv(PATH = paste(old_path, "C:\\Program Files\\Git\\bin", sep = ";"))
+
+```
+
+Start HW 1
+
+By Taner Bertuna
+
+Part 1:
+
+Link to your GitHub repository: https://github.com/jhu-statprogramming-fall-2022/git-github-fundamentals-tjb224
+
+Part 2:
+
+Who am I?
+
+I am an aspiring epidemiologist / data scientist that is focused on working with the public sector to promote infectious disease related health at home and abroad. I come with a diverse set of experiences, having previous worked in construction project management, volunteered in domestic and international hospitals, and interned at the WHO. I am a pragmatic communicator that is detail oriented and mission driven, and am eager to apply what I have learned to promote research and public awareness of vaccine preventable diseases. I believe that population dynamics are not equal to the sum of its individual parts, and through statistics and epidemiological inquiry vital questions can be uncovered and elucidated.
+
+Part 3:
+
+1.  

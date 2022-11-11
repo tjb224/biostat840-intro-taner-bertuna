@@ -1,0 +1,5 @@
+"0","penguins_data %>%"
+"0","  group_by(Sex) %>% "
+"0","  filter(!is.na(`Body Mass (lbs)`)) %>%"
+"0","  filter(!is.na(Sex)) %>%"
+"0","  summarize(mean_mass = mean(`Body Mass (lbs)`)) "

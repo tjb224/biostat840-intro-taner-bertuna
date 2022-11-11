@@ -1,0 +1,2 @@
+"0","penguins_data <- penguins_raw %>% select(studyName:Sex) %>% mutate(`Body Mass (lbs)` = `Body Mass (g)`*.00220462)"
+"0",""

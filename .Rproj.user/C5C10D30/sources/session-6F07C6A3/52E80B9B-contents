@@ -1,0 +1,2738 @@
+---
+title: "Serochit Data Explore"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    number_sections: true
+    
+---
+
+
+use mod1_mergedata_rounds_1ab_wdiaseek
+
+Taner's Serochit Data Explorer!
+
+DATA SETUP {.tabset} 
+
+```{r include = FALSE}
+library(tidyverse)
+library(dplyr)
+library(geosphere)
+library(table1)
+library(ggplot2)
+library(ggalluvial)
+library(lmtest)
+library(expss)
+library(reactable)
+#library(flextable)
+
+setwd("C:/Users/taner/Desktop/Documents/Cholera Study - Serochit/Data Explore")
+
+old_inddata = read_csv("baseline_individual_survey.csv")
+
+old_housedata = read_csv("baseline_household_survey_gps.csv")
+
+old_inddata_1ab = read_csv("baseline_individual_survey_rounds_1ab_only.csv")
+
+hh_gps = read_csv("hh_gps.csv")
+
+income_data = read_csv("income_data.csv")
+
+ind_data_updated_9_16 = read_csv("baseline_individual_data_9_16_update.csv")
+
+hh_data_updated_9_16 = read_csv("baseline_household_data_9_16_update.csv")
+
+data_rounds2_3 = read_csv("followup_individual_data.csv")
+
+data_rounds2_3 <- data_rounds2_3 %>% mutate(round = as.character(round))
+
+#class(data_rounds2_3$round)
+
+data_rounds3_4_follow_up = read_csv("followup_individual_diarrhea_care.csv")
+
+#str(hh_data_updated_9_16)
+#str(old_housedata)
+
+old_inddata %>% filter(round %in% "1b") %>% count(round)
+old_housedata %>% filter(round %in% "1b") %>% count(round)
+length(unique(old_housedata$hh_ID))
+```
+
+Calculate the distance between each hh_id and the port of Chittagong
+```{r include = FALSE}
+xy <- cbind(old_housedata$Longitude_r1, old_housedata$Latitude_r1)
+xy1 <- cbind(91.8018, 22.3091)
+
+#distm(xy, xy1)
+
+housedata <- old_housedata %>% mutate(dist_port = distm(xy, xy1))
+
+#dist <- c(distm(xy, xy1))
+
+```
+
+Calculate the distance between each hh_id and BITID
+```{r include = FALSE}
+
+xy2 <- cbind(91.758553, 22.392736)
+
+#distm(xy, xy1)
+
+housedata <- housedata %>% mutate(dist_BITID = distm(xy, xy2))
+
+
+```
+
+Calculate the distance between each hh_id and the SUHC
+```{r include = FALSE}
+
+xy3 <- cbind(91.664723, 22.6095985)
+
+#distm(xy, xy1)
+
+housedata <- housedata %>% mutate(dist_SUHC = distm(xy, xy3))
+
+```
+
+Merge house and individual baseline datasets 
+```{r include = FALSE}
+
+ind_data_updated_9_16 <- ind_data_updated_9_16 %>% select(c(hh_ID, ID, round, txt_diarrhea1_site_other, txt_diarrhea2_site_other, txt_diarrhea3_site_other, txt_diarrhea1_reason_other, txt_diarrhea2_reason_other, txt_diarrhea3_reason_other, txt_diarrhea1_nocare_other, txt_diarrhea2_nocare_other, txt_diarrhea3_nocare_other))
+
+#ind_data_updated_9_16_1ab <- ind_data_updated_9_16 %>% filter(!round %in% c("2","3"))
+
+inddata <- left_join(old_inddata, ind_data_updated_9_16, by=c("ID", "round", "hh_ID"))
+
+#inddata_xxx <- merge(old_inddata, ind_data_updated_9_16, by="hh_ID")
+
+#inddata_1ab <- merge(old_inddata_1ab, ind_data_updated_9_16_1ab, by="hh_ID")
+
+#mergedatax <- merge(inddata, housedata, by="hh_ID")
+
+mergedata <- left_join(inddata, housedata, by=c("hh_ID", "round"))
+
+#mergedata_rounds_1ab <- merge(inddata_1ab, housedata, by="hh_ID")
+
+mergedata <- merge(mergedata, income_data, by="hh_ID")
+
+#mergedata_rounds_1ab <- merge(mergedata_rounds_1ab, income_data, by="hh_ID")
+
+mergedata_all_rounds <- left_join(mergedata, data_rounds2_3, by=c("ID", "round", "hh_ID", "ind_diarrhea_month", "ind_diarrhea_seek_care"))
+
+mergedata_rounds_1ab <- mergedata %>% filter(!round %in% c("2","3"))
+
+#sum(duplicated(mergedata_all_rounds$ID))
+
+#str(ind_data_updated_9_16)
+
+#HH_sanitation_df <- hh_data_updated_9_16 %>% select(c(hh_id, cat_sanitation_facility, cat_sanitation_flush, cat_sanitation_location, cat_water_trt_type, cat_handwash_obs, cat_handwash_freq))
+
+#length(ind_data_updated_9_16$txt_diarrhea1_site_other)
+#length(old_inddata$cat_diarrhea1_site)
+```
+
+
+Take columns that have multiple entries in them and split them so that there are added columns that have have only one entry in them
+```{r include = FALSE}
+mergedata_rounds_1ab <- separate(data = mergedata_rounds_1ab, col = ind_transport, into = c('ind_transport1', 'ind_transport2', 'ind_transport3')) 
+
+mergedata_rounds_1ab$ind_transport2[is.na(mergedata_rounds_1ab$ind_transport2)] <- 0
+mergedata_rounds_1ab$ind_transport3[is.na(mergedata_rounds_1ab$ind_transport3)] <- 0
+
+#str(mergedata_rounds_1ab)
+
+#mergedata_rounds_1ab <- mergedata_rounds_1ab %>% mutate(ind_transport2 = replace_na(mergedata_rounds_1ab$ind_transport2, 0)) %>% mutate(ind_transport3 = replace_na(mergedata_rounds_1ab$ind_transport3, 0))
+
+#mergedata_rounds_1ab <- separate(data = mergedata_rounds_1ab, col = ind_fuel, into = c('ind_fuel1', 'ind_fuel2', 'ind_fuel3', 'ind_fuel4', 'ind_fuel5', 'ind_fuel6'))
+
+#head(mod1_mergedata_rounds_1ab_split)
+
+```
+
+
+```{r include = FALSE}
+
+#mod1_mergedata_rounds_1ab %>% count(ind_transport1)
+
+mergedata_rounds_1ab <- mergedata_rounds_1ab %>% mutate(ind_transport1_bike = ifelse(ind_transport1 == 'bicycle', 1, 0))
+mergedata_rounds_1ab <- mergedata_rounds_1ab %>% mutate(ind_transport2_bike = ifelse(ind_transport2 == 'bicycle', 1, 0))
+mergedata_rounds_1ab <- mergedata_rounds_1ab %>% mutate(ind_transport3_bike = ifelse(ind_transport3 == 'bicycle', 1, 0))
+
+mergedata_rounds_1ab <- mergedata_rounds_1ab %>% mutate(ind_transport1_boat = ifelse(ind_transport1 == 'boat', 1, 0))
+mergedata_rounds_1ab <- mergedata_rounds_1ab %>% mutate(ind_transport2_boat = ifelse(ind_transport2 == 'boat', 1, 0))
+mergedata_rounds_1ab <- mergedata_rounds_1ab %>% mutate(ind_transport3_boat = ifelse(ind_transport3 == 'boat', 1, 0))
+
+mergedata_rounds_1ab <- mergedata_rounds_1ab %>% mutate(ind_transport1_car = ifelse(ind_transport1 == 'car', 1, 0))
+mergedata_rounds_1ab <- mergedata_rounds_1ab %>% mutate(ind_transport2_car = ifelse(ind_transport2 == 'car', 1, 0))
+mergedata_rounds_1ab <- mergedata_rounds_1ab %>% mutate(ind_transport3_car = ifelse(ind_transport3 == 'car', 1, 0))
+
+mergedata_rounds_1ab <- mergedata_rounds_1ab %>% mutate(ind_transport1_motorbike = ifelse(ind_transport1 == 'motorbike', 1, 0))
+mergedata_rounds_1ab <- mergedata_rounds_1ab %>% mutate(ind_transport2_motorbike = ifelse(ind_transport2 == 'motorbike', 1, 0))
+mergedata_rounds_1ab <- mergedata_rounds_1ab %>% mutate(ind_transport3_motorbike = ifelse(ind_transport3 == 'motorbike', 1, 0))
+
+mergedata_rounds_1ab <- mergedata_rounds_1ab %>% mutate(ind_transport1_cart = ifelse(ind_transport1 == 'cart', 1, 0))
+mergedata_rounds_1ab <- mergedata_rounds_1ab %>% mutate(ind_transport2_cart = ifelse(ind_transport2 == 'cart', 1, 0))
+mergedata_rounds_1ab <- mergedata_rounds_1ab %>% mutate(ind_transport3_cart = ifelse(ind_transport3 == 'cart', 1, 0))
+
+mergedata_rounds_1ab <- mergedata_rounds_1ab %>% mutate(ind_transport1_none = ifelse(ind_transport1 == 'none', 1, 0))
+mergedata_rounds_1ab <- mergedata_rounds_1ab %>% mutate(ind_transport2_none = ifelse(ind_transport2 == 'none', 1, 0))
+mergedata_rounds_1ab <- mergedata_rounds_1ab %>% mutate(ind_transport3_none = ifelse(ind_transport3 == 'none', 1, 0))
+
+mergedata_rounds_1ab <- mergedata_rounds_1ab %>% mutate(ind_transport1_other = ifelse(ind_transport1 == 'other', 1, 0))
+mergedata_rounds_1ab <- mergedata_rounds_1ab %>% mutate(ind_transport2_other = ifelse(ind_transport2 == 'other', 1, 0))
+mergedata_rounds_1ab <- mergedata_rounds_1ab %>% mutate(ind_transport3_other = ifelse(ind_transport3 == 'other', 1, 0))
+
+mergedata_rounds_1ab <- mergedata_rounds_1ab %>% mutate(ind_transport1_rickshaw = ifelse(ind_transport1 == 'rickshaw', 1, 0))
+mergedata_rounds_1ab <- mergedata_rounds_1ab %>% mutate(ind_transport2_rickshaw = ifelse(ind_transport2 == 'rickshaw', 1, 0))
+mergedata_rounds_1ab <- mergedata_rounds_1ab %>% mutate(ind_transport3_rickshaw = ifelse(ind_transport3 == 'rickshaw', 1, 0))
+
+mergedata_rounds_1ab <- mergedata_rounds_1ab %>% mutate(ind_transport_bike = (ind_transport1_bike + ind_transport2_bike + ind_transport3_bike)) %>% mutate(ind_transport_bike = ifelse(ind_transport_bike == 1, 'yes', 'no'))
+
+mergedata_rounds_1ab <- mergedata_rounds_1ab %>% mutate(ind_transport_boat = (ind_transport1_boat + ind_transport2_boat + ind_transport3_boat)) %>% mutate(ind_transport_boat = ifelse(ind_transport_boat == 1, 'yes', 'no'))
+
+mergedata_rounds_1ab <- mergedata_rounds_1ab %>% mutate(ind_transport_car = (ind_transport1_car + ind_transport2_car + ind_transport3_car)) %>% mutate(ind_transport_car = ifelse(ind_transport_car == 1, 'yes', 'no'))
+
+mergedata_rounds_1ab <- mergedata_rounds_1ab %>% mutate(ind_transport_motorbike = (ind_transport1_motorbike + ind_transport2_motorbike + ind_transport3_motorbike)) %>% mutate(ind_transport_motorbike = ifelse(ind_transport_motorbike == 1, 'yes', 'no'))
+
+mergedata_rounds_1ab <- mergedata_rounds_1ab %>% mutate(ind_transport_cart = (ind_transport1_cart + ind_transport2_cart + ind_transport3_cart)) %>% mutate(ind_transport_cart = ifelse(ind_transport_cart == 1, 'yes', 'no'))
+
+mergedata_rounds_1ab <- mergedata_rounds_1ab %>% mutate(ind_transport_none = (ind_transport1_none + ind_transport2_none + ind_transport3_none)) 
+
+mergedata_rounds_1ab <- mergedata_rounds_1ab %>% mutate(ind_have_any_trans = ifelse(ind_transport_none == 1, 'no', 'yes'))
+
+mergedata_rounds_1ab <- mergedata_rounds_1ab %>% mutate(ind_transport_other = (ind_transport1_other + ind_transport2_other + ind_transport3_other)) %>% mutate(ind_transport_other = ifelse(ind_transport_other == 1, 'yes', 'no'))
+
+mergedata_rounds_1ab <- mergedata_rounds_1ab %>% mutate(ind_transport_rickshaw = (ind_transport1_rickshaw + ind_transport2_rickshaw + ind_transport3_rickshaw)) %>% mutate(ind_transport_rickshaw = ifelse(ind_transport_rickshaw == 1, 'yes', 'no'))
+
+mergedata_rounds_1ab <- mergedata_rounds_1ab %>% mutate(cat_diarrhea1_site_pharmacy = ifelse(cat_diarrhea1_site == "pharmacy", 1, 0))
+mergedata_rounds_1ab <- mergedata_rounds_1ab %>% mutate(cat_diarrhea2_site_pharmacy = ifelse(cat_diarrhea2_site == "pharmacy", 1, 0))
+mergedata_rounds_1ab <- mergedata_rounds_1ab %>% mutate(cat_diarrhea3_site_pharmacy = ifelse(cat_diarrhea3_site == "pharmacy", 1, 0))
+
+mergedata_rounds_1ab <- mergedata_rounds_1ab %>% mutate(cat_diarrhea1_site_hosp = ifelse(cat_diarrhea1_site != "pharmacy", 1, 0))
+mergedata_rounds_1ab <- mergedata_rounds_1ab %>% mutate(cat_diarrhea2_site_hosp = ifelse(cat_diarrhea2_site != "pharmacy", 1, 0))
+mergedata_rounds_1ab <- mergedata_rounds_1ab %>% mutate(cat_diarrhea3_site_hosp = ifelse(cat_diarrhea3_site != "pharmacy", 1, 0))
+
+#str(mergedata_rounds_1ab)    
+#count(mergedata_rounds_1ab, cat_diarrhea1_site)
+#count(mergedata_rounds_1ab, cat_diarrhea2_site)
+#count(mergedata_rounds_1ab, cat_diarrhea3_site)
+#head(mergedata_rounds_1ab)
+
+mergedata <- separate(data = mergedata, col = ind_transport, into = c('ind_transport1', 'ind_transport2', 'ind_transport3')) 
+
+mergedata$ind_transport2[is.na(mergedata$ind_transport2)] <- 0
+mergedata$ind_transport3[is.na(mergedata$ind_transport3)] <- 0
+
+mergedata <- mergedata %>% mutate(ind_transport1_none = ifelse(ind_transport1 == 'none', 1, 0))
+mergedata <- mergedata %>% mutate(ind_transport2_none = ifelse(ind_transport2 == 'none', 1, 0))
+mergedata <- mergedata %>% mutate(ind_transport3_none = ifelse(ind_transport3 == 'none', 1, 0))
+
+mergedata <- mergedata %>% mutate(ind_transport_none = (ind_transport1_none + ind_transport2_none + ind_transport3_none)) 
+
+mergedata <- mergedata %>% mutate(ind_have_any_trans = ifelse(ind_transport_none == 1, 'no', 'yes'))
+
+```
+
+
+Remove columns that arent of interest and sort out NAs, note that ind_diarrhea_seek_care is removed because it has too man NAs
+```{r include = FALSE}
+mod1_mergedata <- mergedata[, c("hh_ID", "ID", "round", "n_age", "cat_sex", "cat_activity_month", "ind_edu_school","ind_diarrhea_month","ind_diarrhea_seek_care", "ind_diarrhea1_care", "ind_diarrhea2_care", "ind_diarrhea3_care", "ind_covid1_care","ind_injury1_care", "ind_electricity", "ind_transport1", "ind_transport2", "ind_transport3", "ind_internet", "cat_floors", "cat_walls", "cat_diarrhea1_site","cat_diarrhea1_reason", "dist_port", "dist_BITID", "dist_SUHC", "cat_income", "ind_have_any_trans")]
+
+#str(mergedata)
+#mod1_mergedata_sansNA <- na.omit(mod1_mergedata)
+
+mod1_mergedata_rounds_1ab <- mergedata_rounds_1ab[, c("hh_ID", "ID", "round", "n_age", "cat_sex", "cat_activity_month", "ind_edu_school","ind_diarrhea_month", "ind_diarrhea_seek_care", "ind_diarrhea1_care", "ind_diarrhea2_care", "ind_diarrhea3_care", "ind_covid1_care","ind_injury1_care", "ind_electricity", "ind_fuel", "ind_transport1", "ind_transport2", "ind_transport3", "ind_transport_bike", "ind_transport_boat", "ind_transport_car", "ind_transport_motorbike", "ind_transport_cart", "ind_transport_none", "ind_transport_other", "ind_transport_rickshaw","ind_have_any_trans", "ind_internet", "cat_floors", "cat_walls", "cat_diarrhea1_site", "cat_diarrhea1_site_pharmacy", "cat_diarrhea1_site_hosp", "cat_diarrhea1_reason", "cat_diarrhea2_site", "cat_diarrhea2_site_pharmacy", "cat_diarrhea2_site_hosp", "cat_diarrhea2_reason", "cat_diarrhea3_site", "cat_diarrhea3_site_pharmacy", "cat_diarrhea3_site_hosp", "cat_diarrhea3_reason", "dist_port", "dist_BITID", "dist_SUHC", "cat_income")]
+
+```
+
+
+Add in the variable ind_diarrhea_seek_care (has a lot of blank values) 
+```{r include = FALSE}
+mod1_mergedata_rounds_1ab_wdiaseek <- mergedata_rounds_1ab[, c("hh_ID", "ID", "round", "n_age", "cat_sex", "cat_activity_month", "ind_edu_school","ind_diarrhea_month", "ind_diarrhea1_care","ind_diarrhea_seek_care", "ind_diarrhea2_care", "ind_diarrhea3_care", "ind_covid1_care","ind_injury1_care", "ind_electricity", "ind_fuel", "ind_transport1", "ind_transport2", "ind_transport3", "ind_transport_bike", "ind_transport_boat", "ind_transport_car", "ind_transport_motorbike", "ind_transport_cart", "ind_transport_none", "ind_transport_other", "ind_transport_rickshaw","ind_have_any_trans", "ind_internet", "cat_floors", "cat_walls", "cat_diarrhea1_site", "cat_diarrhea1_reason", "dist_port", "dist_BITID", "dist_SUHC", "cat_income")]
+mod1_mergedata_rounds_1ab_wdiaseek_sansNA <- na.omit(mod1_mergedata_rounds_1ab_wdiaseek)
+ 
+```
+
+```{r include = FALSE}
+
+mod1_mergedata_rounds_1ab <- mod1_mergedata_rounds_1ab %>% mutate(which_hosp_closer = ifelse(mod1_mergedata_rounds_1ab$dist_BITID >= mod1_mergedata_rounds_1ab$dist_SUHC, 'SUHC', 'BITID'))
+
+mod1_mergedata_rounds_1ab_wdiaseek <- mod1_mergedata_rounds_1ab %>% mutate(which_hosp_closer = ifelse(mod1_mergedata_rounds_1ab$dist_BITID >= mod1_mergedata_rounds_1ab$dist_SUHC, 'SUHC', 'BITID'))
+                                                                
+```
+
+convert yes/no responses to 1/0 for possible regression analysis
+```{r include = FALSE}
+
+mod1_mergedata_rounds_1ab <- mod1_mergedata_rounds_1ab %>% mutate(mod_ind_diarrhea1_care = ifelse(mod1_mergedata_rounds_1ab_wdiaseek$ind_diarrhea1_care=="yes",1,0))
+mod1_mergedata_rounds_1ab <- mod1_mergedata_rounds_1ab %>% mutate(mod_ind_diarrhea2_care = ifelse(mod1_mergedata_rounds_1ab_wdiaseek$ind_diarrhea2_care=="yes",1,0))
+mod1_mergedata_rounds_1ab <- mod1_mergedata_rounds_1ab %>% mutate(mod_ind_diarrhea3_care = ifelse(mod1_mergedata_rounds_1ab_wdiaseek$ind_diarrhea3_care=="yes",1,0))
+
+mergedata_rounds_1ab_with_care_cat <- mod1_mergedata_rounds_1ab %>% mutate(diarrhea_care_cat = (mod_ind_diarrhea1_care + mod_ind_diarrhea2_care + mod_ind_diarrhea3_care))
+
+mod1_mergedata_rounds_1ab <- mod1_mergedata_rounds_1ab %>% mutate(diarrhea_care_cat = (mod_ind_diarrhea1_care + mod_ind_diarrhea2_care + mod_ind_diarrhea3_care))
+
+```
+
+make under 6 and over 6 age categories
+```{r include = FALSE}
+mod1_mergedata_rounds_1ab <- mod1_mergedata_rounds_1ab %>% mutate(under_6 = ifelse(mergedata_rounds_1ab$n_age<6, "yes","no"))
+
+mod1_mergedata_rounds_1ab_wdiaseek <- mod1_mergedata_rounds_1ab_wdiaseek %>% mutate(under_6 = ifelse(mod1_mergedata_rounds_1ab_wdiaseek$n_age<6, "yes","no"))
+```
+
+make under 5 and over 5 age categories
+```{r include = FALSE}
+mod1_mergedata_rounds_1ab <- mod1_mergedata_rounds_1ab %>% mutate(under_5 = ifelse(mergedata_rounds_1ab$n_age<5, "yes","no"))
+
+mod1_mergedata <- mod1_mergedata %>% mutate(under_5 = ifelse(mod1_mergedata$n_age<5, "yes","no"))
+
+mod1_mergedata_rounds_1ab_wdiaseek <- mod1_mergedata_rounds_1ab_wdiaseek %>% mutate(under_5 = ifelse(mod1_mergedata_rounds_1ab_wdiaseek$n_age<5, "yes","no"))
+```
+
+make under 3 and over 3 age categories
+```{r include = FALSE}
+mod1_mergedata_rounds_1ab <- mod1_mergedata_rounds_1ab %>% mutate(under_3 = ifelse(mergedata_rounds_1ab$n_age<3, "yes","no"))
+
+mod1_mergedata_rounds_1ab_wdiaseek <- mod1_mergedata_rounds_1ab_wdiaseek %>% mutate(under_3 = ifelse(mod1_mergedata_rounds_1ab_wdiaseek$n_age<3, "yes","no"))
+```
+
+make under 4 and over 4 age categories
+```{r include = FALSE}
+mod1_mergedata_rounds_1ab <- mod1_mergedata_rounds_1ab %>% mutate(under_4 = ifelse(mergedata_rounds_1ab$n_age<4, "yes","no"))
+
+mod1_mergedata_rounds_1ab_wdiaseek <- mod1_mergedata_rounds_1ab_wdiaseek %>% mutate(under_4 = ifelse(mod1_mergedata_rounds_1ab_wdiaseek$n_age<4, "yes","no"))
+```
+
+make under 2 and over 2 age categories
+```{r include = FALSE}
+mod1_mergedata_rounds_1ab <- mod1_mergedata_rounds_1ab %>% mutate(under_2 = ifelse(mergedata_rounds_1ab$n_age<2, "yes","no"))
+
+mod1_mergedata_rounds_1ab_wdiaseek <- mod1_mergedata_rounds_1ab_wdiaseek %>% mutate(under_2 = ifelse(mod1_mergedata_rounds_1ab_wdiaseek$n_age<2, "yes","no"))
+```
+
+make under 10 and over 10 age categories
+```{r include = FALSE}
+mod1_mergedata_rounds_1ab <- mod1_mergedata_rounds_1ab %>% mutate(under_10 = ifelse(mergedata_rounds_1ab$n_age<10, "yes","no"))
+
+mod1_mergedata_rounds_1ab_wdiaseek <- mod1_mergedata_rounds_1ab_wdiaseek %>% mutate(under_10 = ifelse(mod1_mergedata_rounds_1ab_wdiaseek$n_age<10, "yes","no"))
+```
+
+make under 18 and over 18 age categories
+```{r include = FALSE}
+mod1_mergedata_rounds_1ab <- mod1_mergedata_rounds_1ab %>% mutate(under_18 = ifelse(mergedata_rounds_1ab$n_age<18, "yes","no"))
+
+mod1_mergedata_rounds_1ab_wdiaseek <- mod1_mergedata_rounds_1ab_wdiaseek %>% mutate(under_18 = ifelse(mod1_mergedata_rounds_1ab_wdiaseek$n_age<18, "yes","no"))
+```
+
+Add in income over 7K, 10K, and 20K columns to mod1_mergedata
+```{r include = FALSE}
+
+mod1_mergedata_rounds_1ab <- mod1_mergedata_rounds_1ab %>% mutate(Income_over_7K = ifelse(cat_income %in% c("over_twenty", "twenty_k", "ten_k"), "yes","no"))
+mod1_mergedata_rounds_1ab <- mod1_mergedata_rounds_1ab %>% mutate(Income_over_10K = ifelse(cat_income %in% c("over_twenty", "twenty_k"), "yes","no"))
+mod1_mergedata_rounds_1ab <- mod1_mergedata_rounds_1ab %>% mutate(Income_over_20K = ifelse(cat_income %in% c("over_twenty"), "yes","no"))
+
+mod1_mergedata <- mod1_mergedata %>% mutate(Income_over_7K = ifelse(cat_income %in% c("over_twenty", "twenty_k", "ten_k"), "yes","no"))
+mod1_mergedata <- mod1_mergedata %>% mutate(Income_over_10K = ifelse(cat_income %in% c("over_twenty", "twenty_k"), "yes","no"))
+mod1_mergedata <- mod1_mergedata %>% mutate(Income_over_20K = ifelse(cat_income %in% c("over_twenty"), "yes","no"))
+
+```
+
+Make a dataframe that has only those that said yet to ind_diarrhea1_care and one that only has those who said no
+```{r include = FALSE}
+
+dia1_yes_23comp <- mod1_mergedata_rounds_1ab_wdiaseek %>% filter(ind_diarrhea1_care %in% "yes")
+
+dia1_no_23comp <- mod1_mergedata_rounds_1ab_wdiaseek %>% filter(ind_diarrhea1_care %in% "no")
+
+dia2_yes_23comp <- mod1_mergedata_rounds_1ab_wdiaseek %>% filter(ind_diarrhea2_care %in% "yes")
+
+dia2_no_23comp <- mod1_mergedata_rounds_1ab_wdiaseek %>% filter(ind_diarrhea2_care %in% "no")
+
+dia3_yes_23comp <- mod1_mergedata_rounds_1ab_wdiaseek %>% filter(ind_diarrhea3_care %in% "yes")
+
+dia3_no_23comp <- mod1_mergedata_rounds_1ab_wdiaseek %>% filter(ind_diarrhea3_care %in% "no")
+```
+
+Make a quantile category for distance to the port QUESTION: why is HH H604413 marked as NA when it is the lowest point? 
+```{r include = FALSE}
+
+mod1_mergedata_rounds_1ab <- mod1_mergedata_rounds_1ab %>% mutate(dist_quant = cut(
+  mod1_mergedata_rounds_1ab$dist_port,
+  breaks = quantile(mod1_mergedata_rounds_1ab$dist_port, c(0, 0.25, 0.5, 0.75, 1), na.rm = T),
+  labels = c("Most urban", "Less urban", "More rural", "Most rural")
+)) 
+
+mod1_mergedata_rounds_1ab <- mod1_mergedata_rounds_1ab %>% mutate(age_cat = cut(n_age, breaks = c(0, 6, 11, 31, 51, 71, 100), na.rm = T))
+
+
+mod1_mergedata_rounds_1ab_wdiaseek <- mod1_mergedata_rounds_1ab_wdiaseek %>% mutate(dist_quant = cut(
+  mod1_mergedata_rounds_1ab_wdiaseek$dist_port,
+  breaks = quantile(mod1_mergedata_rounds_1ab_wdiaseek$dist_port, c(0, 0.25, 0.5, 0.75, 1), na.rm = T),
+  labels = c("Most urban", "Less urban", "More rural", "Most rural")
+)) 
+
+mod1_mergedata_rounds_1ab_wdiaseek <- mod1_mergedata_rounds_1ab_wdiaseek %>% mutate(age_cat = cut(n_age, breaks = c(0, 6, 11, 31, 51, 71, 100), na.rm = T))
+
+mod1_mergedata_rounds_1ab <- mod1_mergedata_rounds_1ab %>% mutate(port_dist_binary = ifelse(dist_quant %in% c("Less urban", "More rural"), "Peri-Urban/Rural", "Urban or Rural"))
+
+
+
+
+
+mod1_mergedata <- mod1_mergedata %>% mutate(dist_quant = cut(
+  mod1_mergedata$dist_port,
+  breaks = quantile(mod1_mergedata$dist_port, c(0, 0.25, 0.5, 0.75, 1), na.rm = T),
+  labels = c("Most urban", "Less urban", "More rural", "Most rural")
+)) 
+
+mod1_mergedata <- mod1_mergedata %>% mutate(age_cat = cut(n_age, breaks = c(0, 6, 11, 31, 51, 71, 100), na.rm = T))
+
+mod1_mergedata <- mod1_mergedata %>% mutate(port_dist_binary = ifelse(dist_quant %in% c("Less urban", "More rural"), "Peri-Urban/Rural", "Urban or Rural"))
+```
+
+Filter only those who had dia in the last month
+```{r include = FALSE}
+yes_dia_in_last_month <- mod1_mergedata_rounds_1ab_wdiaseek %>% filter(ind_diarrhea_month %in% "yes")
+```
+
+Filter only those who answered yes to ind_diarrhea1,2,3_care
+```{r include = FALSE}
+yes_to_ind_diarrhea1_care <- mod1_mergedata_rounds_1ab %>% filter(ind_diarrhea1_care %in% "yes")
+yes_to_ind_diarrhea2_care <- mod1_mergedata_rounds_1ab %>% filter(ind_diarrhea2_care %in% "yes")
+yes_to_ind_diarrhea3_care <- mod1_mergedata_rounds_1ab %>% filter(ind_diarrhea3_care %in% "yes")
+
+```
+
+Make a column for those what would seek care at BITID or SUHC and a column for those who would seek at a pharmacy, based on responses to cat_diarrhea1_seek
+```{r include = FALSE}
+
+yes_to_ind_diarrhea1_care <- yes_to_ind_diarrhea1_care %>% mutate(diarrhea1_seek_at_our_hosps = ifelse(cat_diarrhea1_site %in% c("bitid_hosp","sitakunda_uhc"), "yes","no"))
+mod1_mergedata_rounds_1ab <- mod1_mergedata_rounds_1ab %>% mutate(diarrhea1_seek_at_our_hosps = ifelse(cat_diarrhea1_site %in% c("bitid_hosp","sitakunda_uhc"), "yes","no"))
+
+yes_to_ind_diarrhea1_care <- yes_to_ind_diarrhea1_care %>% mutate(diarrhea1_seek_at_pharm = ifelse(cat_diarrhea1_site %in% c("pharmacy"), "yes","no"))
+
+mod1_mergedata_rounds_1ab <- mod1_mergedata_rounds_1ab %>% mutate(diarrhea1_seek_at_hosp = ifelse(cat_diarrhea1_site %in% c("pharmacy"), "no","yes"))
+
+mod1_mergedata_rounds_1ab <- mod1_mergedata_rounds_1ab %>% mutate(diarrhea1_seek_facility = ifelse(cat_diarrhea1_site %in% c("pharmacy"), "pharm","hosp"))
+
+mod1_mergedata_rounds_1ab <- mod1_mergedata_rounds_1ab %>% mutate(diarrhea1_seek_facility = ifelse(cat_diarrhea1_site %in% c("chittagong_hosp", "other_uhc", "union"), "other hosp", cat_diarrhea1_site))
+
+```
+
+Make a column for those what would seek care at BITID or SUHC and a column for those who would seek at a pharmacy, based on responses to cat_diarrhea2_seek
+```{r include = FALSE}
+yes_to_ind_diarrhea2_care <- yes_to_ind_diarrhea2_care %>% mutate(diarrhea2_seek_at_our_hosps = ifelse(cat_diarrhea2_site %in% c("bitid_hosp","sitakunda_uhc"), "yes","no"))
+mod1_mergedata_rounds_1ab <- mod1_mergedata_rounds_1ab %>% mutate(diarrhea2_seek_at_our_hosps = ifelse(cat_diarrhea2_site %in% c("bitid_hosp","sitakunda_uhc"), "yes","no"))
+
+yes_to_ind_diarrhea2_care <- yes_to_ind_diarrhea2_care %>% mutate(diarrhea2_seek_at_pharm = ifelse(cat_diarrhea2_site %in% c("pharmacy"), "yes","no"))
+mod1_mergedata_rounds_1ab <- mod1_mergedata_rounds_1ab %>% mutate(diarrhea2_seek_at_pharm = ifelse(cat_diarrhea2_site %in% c("pharmacy"), "yes","no"))
+
+mod1_mergedata_rounds_1ab <- mod1_mergedata_rounds_1ab %>% mutate(diarrhea2_seek_at_hosp = ifelse(cat_diarrhea2_site %in% c("pharmacy"), "no","yes"))
+
+mod1_mergedata_rounds_1ab <- mod1_mergedata_rounds_1ab %>% mutate(diarrhea2_seek_facility = ifelse(cat_diarrhea2_site %in% c("pharmacy"), "pharm","hosp"))
+
+mod1_mergedata_rounds_1ab <- mod1_mergedata_rounds_1ab %>%
+  mutate(diarrhea2_seek_facility = ifelse(cat_diarrhea2_site %in% c("cmch_college", "hathazari_uhc", "other_private", "other_uhc", "union"), "other hosp", cat_diarrhea2_site)) 
+
+#cross_cases(mod1_mergedata_rounds_1ab, cat_diarrhea2_site)
+```
+
+Make a column for those what would seek care at BITID or SUHC and a column for those who would seek at a pharmacy, based on responses to cat_diarrhea3_seek
+```{r include = FALSE}
+yes_to_ind_diarrhea3_care <- yes_to_ind_diarrhea3_care %>% mutate(diarrhea3_seek_at_our_hosps = ifelse(cat_diarrhea3_site %in% c("bitid_hosp","sitakunda_uhc"), "yes","no"))
+mod1_mergedata_rounds_1ab <- mod1_mergedata_rounds_1ab %>% mutate(diarrhea3_seek_at_our_hosps = ifelse(cat_diarrhea3_site %in% c("bitid_hosp","sitakunda_uhc"), "yes","no"))
+
+yes_to_ind_diarrhea3_care <- yes_to_ind_diarrhea3_care %>% mutate(diarrhea3_seek_at_pharm = ifelse(cat_diarrhea3_site %in% c("pharmacy"), "yes","no"))
+mod1_mergedata_rounds_1ab <- mod1_mergedata_rounds_1ab %>% mutate(diarrhea3_seek_at_pharm = ifelse(cat_diarrhea3_site %in% c("pharmacy"), "yes","no"))
+
+mod1_mergedata_rounds_1ab <- mod1_mergedata_rounds_1ab %>% mutate(diarrhea3_seek_at_hosp = ifelse(cat_diarrhea3_site %in% c("pharmacy"), "no","yes"))
+
+mod1_mergedata_rounds_1ab <- mod1_mergedata_rounds_1ab %>% mutate(diarrhea3_seek_facility = ifelse(cat_diarrhea3_site %in% c("alamin_private", "chittagong_hosp", "cmch_college", "hathazari_uhc", "other_hosp", "other_uhc", "other_private", "private", "union"), "other hosp", cat_diarrhea3_site))
+                                                                                                  
+cross_cases(mod1_mergedata_rounds_1ab, diarrhea3_seek_facility)
+```
+
+Filter only those who answered no to ind_diarrhea1,2,3_care
+```{r include = FALSE}
+no_to_ind_diarrhea1_care <- mod1_mergedata_rounds_1ab %>% filter(ind_diarrhea1_care %in% "no")
+no_to_ind_diarrhea2_care <- mod1_mergedata_rounds_1ab %>% filter(ind_diarrhea2_care %in% "no")
+no_to_ind_diarrhea3_care <- mod1_mergedata_rounds_1ab %>% filter(ind_diarrhea3_care %in% "no")
+```
+
+Filter under 5s and over 5's for those who answered yes to ind_diarrhea1,2,3_care  
+```{r include = FALSE}
+yes_to_ind_diarrhea1_care_under5 <- yes_to_ind_diarrhea1_care %>% filter(under_5 %in% "yes")
+yes_to_ind_diarrhea2_care_under5 <- yes_to_ind_diarrhea2_care %>% filter(under_5 %in% "yes")
+yes_to_ind_diarrhea3_care_under5 <- yes_to_ind_diarrhea3_care %>% filter(under_5 %in% "yes")
+yes_to_ind_diarrhea1_care_over5 <- yes_to_ind_diarrhea1_care %>% filter(under_5 %in% "no")
+yes_to_ind_diarrhea2_care_over5 <- yes_to_ind_diarrhea2_care %>% filter(under_5 %in% "no")
+yes_to_ind_diarrhea3_care_over5 <- yes_to_ind_diarrhea3_care %>% filter(under_5 %in% "no")
+```
+
+Filter those who said they would or wouldn't seek care at BITID or SUHC among those who said yes to ind_diarrhea1,2,3_care
+```{r include = FALSE}
+yes_to_ind_diarrhea1_care_yes_our_hosp <- yes_to_ind_diarrhea1_care %>% filter(diarrhea1_seek_at_our_hosps %in% "yes")
+yes_to_ind_diarrhea2_care_yes_our_hosp <- yes_to_ind_diarrhea2_care %>% filter(diarrhea2_seek_at_our_hosps %in% "yes")
+yes_to_ind_diarrhea3_care_yes_our_hosp <- yes_to_ind_diarrhea3_care %>% filter(diarrhea3_seek_at_our_hosps %in% "yes")
+yes_to_ind_diarrhea1_care_no_our_hosp <- yes_to_ind_diarrhea1_care %>% filter(diarrhea1_seek_at_our_hosps %in% "no")
+yes_to_ind_diarrhea2_care_no_our_hosp <- yes_to_ind_diarrhea2_care %>% filter(diarrhea2_seek_at_our_hosps %in% "no")
+yes_to_ind_diarrhea3_care_no_our_hosp <- yes_to_ind_diarrhea3_care %>% filter(diarrhea3_seek_at_our_hosps %in% "no")
+```
+
+
+Set up data frames for each HC seeking question so we can cleanly remove NAs
+```{r include = FALSE}
+
+healthseek_dia1_mergedata_rounds_1ab <- mod1_mergedata_rounds_1ab[, c("hh_ID", "ID", "round", "n_age", "age_cat", "cat_sex", "ind_diarrhea1_care", "cat_diarrhea1_site", "cat_diarrhea1_reason", "dist_port", "under_5", "under_4", "under_3", "under_2", "under_10", "diarrhea1_seek_at_our_hosps", "dist_quant", "cat_diarrhea1_site_pharmacy", "cat_income")]
+
+healthseek_dia1_mergedata_rounds_1ab_sansNA <- na.omit(healthseek_dia1_mergedata_rounds_1ab)
+
+healthseek_dia2_mergedata_rounds_1ab <- mod1_mergedata_rounds_1ab[, c("hh_ID", "ID", "round", "n_age", "age_cat", "cat_sex", "ind_diarrhea2_care", "cat_diarrhea2_site", "cat_diarrhea2_reason", "dist_port", "under_5", "under_4", "under_3", "under_2", "under_10", "diarrhea2_seek_at_our_hosps", "dist_quant", "cat_diarrhea2_site_pharmacy", "cat_income")]
+
+healthseek_dia2_mergedata_rounds_1ab_sansNA <- na.omit(healthseek_dia2_mergedata_rounds_1ab)
+
+healthseek_dia3_mergedata_rounds_1ab <- mod1_mergedata_rounds_1ab[, c("hh_ID", "ID", "round", "n_age", "age_cat", "cat_sex", "ind_diarrhea3_care", "cat_diarrhea3_site", "cat_diarrhea3_reason", "dist_port", "under_5", "under_4", "under_3", "under_2", "under_10", "diarrhea3_seek_at_our_hosps", "dist_quant", "cat_diarrhea3_site_pharmacy", "cat_income")]
+
+healthseek_dia3_mergedata_rounds_1ab_sansNA <- na.omit(healthseek_dia3_mergedata_rounds_1ab)
+
+#str(mod1_mergedata_rounds_1ab)
+
+foralluv_healthseek_dia1_mergedata_rounds_1ab <- mod1_mergedata_rounds_1ab[, c( "cat_sex", "ind_diarrhea1_care", "cat_diarrhea1_site", "cat_diarrhea1_reason", "under_5", "under_2", "under_4", "under_3", "under_10", "diarrhea1_seek_at_our_hosps", "dist_quant", "age_cat", "cat_diarrhea1_site_pharmacy", "cat_income")]
+
+foralluv_healthseek_dia1_mergedata_rounds_1ab_sansNA <- na.omit(foralluv_healthseek_dia1_mergedata_rounds_1ab)
+
+foralluv_healthseek_dia2_mergedata_rounds_1ab <- mod1_mergedata_rounds_1ab[, c( "cat_sex", "ind_diarrhea2_care", "cat_diarrhea2_site", "cat_diarrhea2_reason", "under_5", "under_2", "under_4", "under_3", "under_10", "diarrhea2_seek_at_our_hosps", "dist_quant", "age_cat", "cat_diarrhea2_site_pharmacy", "cat_income")]
+
+foralluv_healthseek_dia3_mergedata_rounds_1ab <- mod1_mergedata_rounds_1ab[, c( "cat_sex", "ind_diarrhea3_care", "cat_diarrhea2_site", "cat_diarrhea3_reason", "under_5", "under_2", "under_4", "under_3", "under_10", "diarrhea3_seek_at_our_hosps", "dist_quant", "age_cat", "cat_diarrhea3_site_pharmacy", "cat_income")]
+```
+
+Remove "decline" from the ind_edu_school column for regression 
+```{r include = FALSE}
+
+mod1_mergedata_rounds_1ab_sans_indedu_decline <- mod1_mergedata_rounds_1ab %>% filter(!ind_edu_school %in% "decline")
+
+#str(mod1_mergedata_rounds_1ab)
+```
+
+Remove "na" from the ind_diarhhea_month and "decline from ind_edu_school
+```{r include = FALSE}
+
+mod1_mergedata_rounds_1ab_filtered_ind_diarrhea_month <- mod1_mergedata_rounds_1ab %>% filter(!ind_diarrhea_month %in% "na")
+mod1_mergedata_rounds_1ab_filtered <- mod1_mergedata_rounds_1ab %>% filter(!ind_edu_school %in% "decline")
+#str(mod1_mergedata_rounds_1ab)
+```
+
+```{r include = FALSE}
+
+mod1_mergedata_rounds_1ab = apply_labels(mod1_mergedata_rounds_1ab,
+                                         under_10 = "Under 10 Years of Age",
+                                         under_5 = "Under 5 Years of Age",
+                                         under_4 = "Under 4 Years of Age",
+                                         under_3 = "Under 3 Years of Age",
+                                         under_2 = "Under 2 Years of Age",
+                                         ind_diarrhea3_care = "Would seek care for worst symptoms?",
+                                         ind_diarrhea2_care = "Would seek care for mid symptoms?",
+                                         ind_diarrhea1_care = "Would seek care for mild symptoms?",
+                                         n_age = "Age in Years",
+                                         cat_sex = "Sex (Male or Female)",
+                                         cat_diarrhea1_site_pharmacy = "Would you seek care at a pharmacy for the least symptoms?",
+                                         cat_diarrhea2_site_pharmacy = "Would you seek care at a pharmacy for mid symptoms?",
+                                         cat_diarrhea3_site_pharmacy = "Would you seek care at a pharmacy for worst symptoms?",
+                                         dist_port = "Distance to Chittagong Port (Meters)",
+                                         dist_quant = "Individuals distance to port",
+                                         cat_diarrhea1_reason = "Why would you seek care where you indicated? (least sevrere symptoms)", 
+                                         cat_diarrhea2_reason = "Why would you seek care where you indicated? (somewhat sevrere symptoms)", 
+                                         cat_diarrhea3_reason = "Why would you seek care where you indicated? (most sevrere symptoms)",
+                                         diarrhea_care_cat = "How many of the ind_diarrhea_care questions were answered yes",
+                                         diarrhea1_seek_at_our_hosps = "Did they seek care at either BITID or SUHC?",
+                                         ind_diarrhea_seek_care = "Did you seek care?",
+                                         ind_diarrhea_month = "Did you have dia in the last month?",
+                                         age_cat = "Age Category (Years)",
+                                         which_hosp_closer = "Which hospital is closer?",
+                                         diarrhea1_seek_facility = "Health facility for worst symptoms",
+                                         diarrhea2_seek_facility = "Health facility for mid symptoms",
+                                         diarrhea3_seek_facility = "Health facility for mild symptoms",
+                                         cat_income = "Income Category",
+                                         ind_edu_school = "Any Education",
+                                         ind_have_any_trans = "Access to Personal Transport",
+                                         cat_floors = "Floor Contruction Material",
+                                         ind_electricity = "Household Access to Electricity")
+                                         
+mod1_mergedata_rounds_1ab_wdiaseek = apply_labels(mod1_mergedata_rounds_1ab_wdiaseek,
+                                         under_10 = "Under 10 Years of Age",
+                                         under_5 = "Under 5 Years of Age",
+                                         under_4 = "Under 4 Years of Age",
+                                         under_3 = "Under 3 Years of Age",
+                                         under_2 = "Under 2 Years of Age",
+                                         ind_diarrhea3_care = "Would seek care for worst symptoms?",
+                                         ind_diarrhea2_care = "Would seek care for mid symptoms?",
+                                         ind_diarrhea1_care = "Would seek care for mild symptoms?",
+                                         n_age = "Age in Years",
+                                         cat_sex = "Sex (Male or Female)",
+                                         diarrhea1_seek_at_pharm = "Would you seek care at a pharmacy for the least symptoms?",
+                                         diarrhea2_seek_at_pharm = "Would you seek care at a pharmacy for mid symptoms?",
+                                         diarrhea3_seek_at_pharm = "Would you seek care at a pharmacy for worst symptoms?",
+                                         dist_port = "Distance to Chittagong Port (Meters)",
+                                         dist_quant = "Individuals distance to port",
+                                         cat_diarrhea1_reason = "Why would you seek care where you indicated? (least sevrere symptoms)", 
+                                         cat_diarrhea2_reason = "Why would you seek care where you indicated? (somewhat sevrere symptoms)", 
+                                         cat_diarrhea3_reason = "Why would you seek care where you indicated? (most sevrere symptoms)",
+                                         diarrhea_care_cat = "How many of the ind_diarrhea_care questions were answered yes",
+                                         diarrhea1_seek_at_our_hosps = "Did they seek care at either BITID or SUHC?",
+                                         ind_diarrhea_seek_care = "Did you seek care?",
+                                         ind_diarrhea_month = "Did you have dia in the last month?",
+                                         age_cat = "Age Category (Years)",
+                                         which_hosp_closer = "Which hospital is closer?",
+                                         diarrhea1_seek_facility = "Health facility for worst symptoms",
+                                         diarrhea2_seek_facility = "Health facility for mid symptoms",
+                                         diarrhea3_seek_facility = "Health facility for mild symptoms",
+                                         cat_income = "Income Category",
+                                         ind_edu_school = "Any Education",
+                                         ind_have_any_trans = "Access to Personal Transport",
+                                         ind_diarrhea_seek_care = "Did you seek care?",
+                                         cat_floors = "Floor Contruction Material")                                         
+
+yes_dia_in_last_month = apply_labels(yes_dia_in_last_month,
+                                         under_10 = "Under 10 Years of Age",
+                                         under_5 = "Under 5 Years of Age",
+                                         under_4 = "Under 4 Years of Age",
+                                         under_3 = "Under 3 Years of Age",
+                                         under_2 = "Under 2 Years of Age",
+                                         ind_diarrhea3_care = "Would seek care for worst symptoms?",
+                                         ind_diarrhea2_care = "Would seek care for mid symptoms?",
+                                         ind_diarrhea1_care = "Would seek care for mild symptoms?",
+                                         n_age = "Age in Years",
+                                         cat_sex = "Sex (Male or Female)",
+                                         diarrhea1_seek_at_pharm = "Would you seek care at a pharmacy for the least symptoms?",
+                                         diarrhea2_seek_at_pharm = "Would you seek care at a pharmacy for mid symptoms?",
+                                         diarrhea3_seek_at_pharm = "Would you seek care at a pharmacy for worst symptoms?",
+                                         dist_port = "Distance to Chittagong Port (Meters)",
+                                         dist_quant = "Individuals distance to port",
+                                         cat_diarrhea1_reason = "Why would you seek care where you indicated? (least sevrere symptoms)", 
+                                         cat_diarrhea2_reason = "Why would you seek care where you indicated? (somewhat sevrere symptoms)", 
+                                         cat_diarrhea3_reason = "Why would you seek care where you indicated? (most sevrere symptoms)",
+                                         diarrhea_care_cat = "How many of the ind_diarrhea_care questions were answered yes",
+                                         diarrhea1_seek_at_our_hosps = "Did they seek care at either BITID or SUHC?",
+                                         ind_diarrhea_seek_care = "Did you seek care?",
+                                         ind_diarrhea_month = "Did you have dia in the last month?",
+                                         age_cat = "Age Category (Years)",
+                                         which_hosp_closer = "Which hospital is closer?",
+                                         diarrhea1_seek_facility = "Health facility for worst symptoms",
+                                         diarrhea2_seek_facility = "Health facility for mid symptoms",
+                                         diarrhea3_seek_facility = "Health facility for mild symptoms",
+                                         cat_income = "Income Category",
+                                         ind_edu_school = "Any Education",
+                                         ind_have_any_trans = "Access to Personal Transport",
+                                         ind_diarrhea_seek_care = "Did you seek care?",
+                                         cat_floors = "Floor Contruction Material")       
+
+healthseek_dia3_mergedata_rounds_1ab = apply_labels(healthseek_dia3_mergedata_rounds_1ab,
+                                                    under_5 = "Under 5 Years of Age",
+                                                    ind_diarrhea3_care = "Would you seek care for the most severe symptoms?")
+
+```
+
+## For merging rounds 1,2,3 data to analyize ind_diarrhea_month
+
+```{r}
+
+mergedata_x <- mod1_mergedata %>% select(hh_ID, ID, ind_diarrhea_month, ind_diarrhea_seek_care, round) 
+
+mergedata_xx <- bind_rows(mergedata_x,data_rounds2_3)
+
+mergedata_xxx <- mod1_mergedata %>% select(ID, under_5, ind_edu_school, cat_sex, n_age, dist_quant, dist_port, cat_income, ind_have_any_trans, ind_electricity, ind_internet) 
+
+mod1_mergedata_all_rounds <- left_join(mergedata_xxx, mergedata_xx, by = c("ID"))
+
+
+```
+
+```{r MMAKE TABLE 1s, echo = FALSE}
+#table1(~ dist_quant + n_age + ind_internet + cat_sex + ind_edu_school | cat_diarrhea1_site_hosp, data=mod1_mergedata_rounds_1ab, caption = "Care seeking table 1")
+
+#table1(~ dist_quant + n_age + ind_internet + cat_sex + ind_edu_school | diarrhea_care_cat, data=mod1_mergedata_rounds_1ab, caption = "Care seeking table 1")
+
+#table1(~ dist_quant + n_age | cat_diarrhea1_site, data=mod1_mergedata_rounds_1ab, caption = "Cat_diarrhea1_site answers by Urbanicity")
+
+#Take away: it doesn't look like distance from the port affects their response to the care seeking questions
+
+#WHY does internet make people less likely to seek care?
+
+#table1(~ dist_quant + n_age + under_5 + ind_internet + cat_sex + ind_edu_school| ind_diarrhea1_care, data=mergedata_rounds_1ab_no_cat_site_or_reason, caption = "Table 1: Characteristics of Serochit participants based on their response to the ind_diarrhea1_care survey question")
+#table1(~ dist_quant + n_age + under_5 + ind_internet + cat_sex + ind_edu_school| ind_diarrhea1_care, data=mod1_mergedata_rounds_1ab, caption = "Table 1: Characteristics of Serochit participants based on their response to the ind_diarrhea1_care survey question")
+#table1(~ dist_quant + n_age + under_5 + ind_internet + cat_sex + ind_edu_school| ind_diarrhea2_care, data=mod1_mergedata_rounds_1ab, caption = "Table 1: Characteristics of Serochit participants based on their response to the ind_diarrhea2_care survey question")
+#table1(~ dist_quant + n_age + under_5 + ind_internet + cat_sex + ind_edu_school| ind_diarrhea3_care, data=mod1_mergedata_rounds_1ab, caption = "Table 1: Characteristics of Serochit participants based on their response to the ind_diarrhea3_care survey question")
+```
+
+Build SES Index
+* Factors to include 
+  + Any transport 
+  + Walls
+  + Floors
+  + Fridge (can use)
+  + Livestock
+  + Sanitation facility (if on property)
+  
+```{r}
+library(psych)
+library(stats)
+
+housedata %>% mutate(people_per_room = n_resident_total / n_room) %>% mutate(crowding = ifelse(people_per_room <= 5, 1, 0)) %>% count(crowding) # Do not include because only 6 of the dwellings were over crowded per the set point.
+
+ses_index_data <- housedata %>%
+  mutate(ses_walls = ifelse(cat_walls %in% c("mud", "tin"), 0, 1)) %>%
+  mutate(ses_floors = ifelse(cat_floors %in% c("mud", "tin"), 0, 1)) %>%
+  mutate(ses_transport = ifelse(ind_transport == "none", 0, 1)) %>%
+  mutate(ses_fridge = ifelse(ind_fridge == "no", 0, 1)) %>%
+  mutate(ses_internet = ifelse(ind_internet == "no", 0, 1)) %>%
+  select(c("hh_ID", "ses_walls", "ses_floors", "ses_internet", "ses_fridge", "ses_transport")) %>%
+  na.omit()
+  
+length(unique(ses_index_data$hh_ID))
+
+str(ses_index_data)
+
+ses_index_data[,2:6]
+
+ses_prn <- prcomp(ses_index_data[,2:6], scale = T)
+
+ses_prn$rotation <- -1*ses_prn$rotation
+
+ses_prn$rotation
+
+ses_prn$x
+
+summary(ses_prn)
+
+#ses_prn <- principal(ses_index_data[,2:6], rotate="varimax", nfactors=3,covar=T, scores=TRUE)
+
+#index = ses_prn$scores[,1]
+
+#nlab<-c(1,2,3,4,5)
+
+#ses_prn_test <- mutate(ses_index_data[,2:6],quintile=as.factor(cut(index,breaks=5,labels=nlab)))
+```
+
+
+
+# ANALYSIS PLAN
+
+__________________________________________________________________________________________________
+
+### Background:
+
+Cholera remains a major global health problem, resulting in more than 100,000 deaths and several million cases annually. Bangladesh, which lies in the Ganges River Delta, is a hyper endemic country and has an estimated 300,000 cholera cases and over 4,500 deaths annually. While disease onset may progress quickly to severe dehydration and death, previous advances in oral rehydration therapy and disease treatment have greatly increased an individuals odds of survival so long as they seek or are administered treatment. While our ability to treat the disease has greatly increased in effectiveness, there is a lack of understanding of general diarrheal disease healthcare seeking behaviors and what factors contribute to an individuals willingness to present themselves to a healthcare facility for treatment. 
+
+### Goals:
+
+* To describe diarrhea related healthcare seeking behavior in Chittagong, Bangladesh. 
+* To understand what factors contribute to an increase, or decrease, in diarrhea related healthcare seeking behavior in Chittagong, Bangladesh.
+  + Does length of stay in your house impact this?
+  + Do SES indicators impact this?
+  + Does education of the HH head or the individual impact this? 
+  + Does age impact this? 
+* To determine why people may or may not seek care at either BITID or SUHC for their diarrheal illness.
+  + Does age impact this?
+  + Does severity impact this? 
+* To determine why some people might seek non-hospital related care for their diarrheal disease. 
+
+### Outcomes:
+
+* Primary - Healthcare seeking behavior as indicated by the Serochit survey 
+  + Indication that they would seek healthcare for diarrhea disease via the ind_diarrhea1_care, ind_diarrhea2_care, and ind_diarrhea3_care survey responses 
+  + Indicating that they had experienced diarrhea symptoms in the last month via the ind_diarrhea_month question and subsequent indication that they sought care via their response to the ind_diarrhea_seek_care
+* Secondary – Where would individuals seek care as indicated by the cat_diarrhea1_site, cat_diarrhea2_site, and cat_diarrhea3_site questions 
+
+### Covariates:
+
+* Age (under 5 or over 5)
+* Sex
+* Occupation (cat_activity_month)
+* Education (ind_edu_school, cat_edu_attainment)
+* Distance to port quantiles as an indication of household setting (rural vs urban)
+* Hygienic practices
+* Access to personal transportation
+* SES indicators 
+  + Access to internet
+  + House construction materials
+  + Access to electricity 
+  + Monthly HH income
+  
+### Table 1
+
+```{r echo = FALSE}
+
+table1_data <- mod1_mergedata_rounds_1ab %>% filter(!ind_diarrhea_month %in% "na") 
+
+table1_data %>%
+  tab_cols(ind_diarrhea_month, ind_diarrhea_seek_care, ind_diarrhea1_care, ind_diarrhea2_care, ind_diarrhea3_care) %>%
+  tab_cells() %>%
+  tab_stat_cases(label = "count") %>%
+  tab_stat_rpct() %>%
+  tab_cells(n_age) %>% 
+  tab_stat_mean(label = "Years") %>%
+  tab_stat_sd(label = "Years") %>%
+  tab_cells(age_cat, under_5, cat_sex, dist_quant, ind_electricity, ind_internet, ind_have_any_trans, cat_income, ind_edu_school) %>%
+  tab_stat_rpct(total_row_position = "none", label = "%") %>%
+  tab_pivot(stat_position = "inside_rows") %>%
+  htmlTable(caption = "Table 1: Exploring Healthcare Seeking Behavior in Roundds 1A and 1B")
+
+
+```
+
+### HH Map woth Hospitals 
+
+```{r echo = FALSE}
+knitr::include_graphics("C:/Users/taner/Desktop/Documents/Cholera Study - Serochit/ARCGIS/Serochit_HH_Map.jpg")
+```
+
+### Conceptual Framework
+
+```{r echo = FALSE}
+knitr::include_graphics("C:/Users/taner/Desktop/Documents/Cholera Study - Serochit/Updated_dag.png")
+```
+
+### Data Collection Rounds Table and SES table 
+
+```{r}
+library(reactablefmtr)
+
+rounds_table = read_csv("data_rounds.csv")
+
+rounds_table_react = reactable(rounds_table) 
+
+rounds_table_react %>% add_title(title = "Table 1: Data Collection Rounds", align = "left", font_size = 18)
+
+ses_table = read_csv("ses_index_table.csv")
+
+ses_table_react = reactable(ses_table)
+
+ses_table_react %>% add_title(title = "Table 2: SES dimensions and factors", align = "left", font_size = 18)
+```
+
+### Analysis
+
+The analysis will utilize a logistic regression to assess the change in odds of seeking healthcare behavior for diarrheal illness. This method was chosen since the outcome of interest is a binomial variable.
+
+__________________________________________________________________________________________________
+# QC
+
+```{r echo = FALSE}
+
+head(mod1_mergedata_rounds_1ab)
+
+length(unique(mod1_mergedata_rounds_1ab$ID))
+
+length((mod1_mergedata_rounds_1ab$ID))
+
+mod1_mergedata_rounds_1ab %>% count(ind_diarrhea1_care) # sum = 2337
+
+mod1_mergedata_rounds_1ab %>% count(ind_diarrhea2_care) # sum = 2337
+
+mod1_mergedata_rounds_1ab %>% count(ind_diarrhea3_care) # sum = 2337
+
+mod1_mergedata_rounds_1ab %>% count(cat_diarrhea1_site) # sum = 2337
+
+length((mod1_mergedata_rounds_1ab$cat_diarrhea1_site))
+
+length((mod1_mergedata_rounds_1ab$cat_diarrhea2_site)) # sum = 2337
+
+mod1_mergedata_rounds_1ab %>% count(cat_diarrhea2_site)
+
+length((mod1_mergedata_rounds_1ab$cat_diarrhea3_site)) # sum = 2337
+
+mod1_mergedata_rounds_1ab %>% count(cat_diarrhea3_site)
+
+IQR(mod1_mergedata_rounds_1ab$n_age, na.rm=T)
+
+
+
+ind_data_updated_9_16 %>% count(txt_diarrhea1_site_other)
+ind_data_updated_9_16 %>% count(txt_diarrhea2_site_other)
+ind_data_updated_9_16 %>% count(txt_diarrhea3_site_other)
+ind_data_updated_9_16 %>% count(txt_diarrhea1_reason_other)
+ind_data_updated_9_16 %>% count(txt_diarrhea1_reason_other)
+ind_data_updated_9_16 %>% count(txt_diarrhea1_reason_other)
+
+```
+
+```{r}
+
+
+
+
+```
+
+# START DATA EXPLORE 
+
+__________________________________________________________________________________________________
+
+### Explore outcome dynamics for those who had diarrhea in the last month and for those that sought care, for all rounds
+
+```{r echo = FALSE}
+mod1_mergedata_all_rounds %>%
+  tab_cols(ind_diarrhea_month) %>%
+  tab_stat_unweighted_valid_n(label = "Total n") %>%
+  tab_cells(n_age) %>%
+  tab_stat_mean(label = "Mean (Years)") %>%
+  tab_stat_sd(label = "Std Dev (Years)") %>%
+  tab_cells(under_5, cat_sex, dist_quant, ind_have_any_trans, cat_income) %>%
+  tab_stat_rpct(total_statistic = "u_responses",total_row_position = "none", label = "(%)") %>%
+  tab_pivot() %>%
+  htmlTable(caption = "Who Had Diarrhea in the Last Month?")
+
+
+```
+
+```{r}
+#x= factor(cat_income, level=c('three_k', 'five_k', 'seven_k', 'ten_k', "twenty_k", "over_twenty")))
+cat_income_by_round <- mod1_mergedata_all_rounds %>% mutate(new_rounds = ifelse(round %in% c("1a", "1b"), "1", round)) %>% group_by(new_rounds) %>% count(cat_income)
+
+# make a graph to show how many people are in each income category by rounds 
+cat_income_by_round %>%
+  ggplot(aes(fill= new_rounds , y=n, x=factor(cat_income, level=c('three_k', 'five_k', 'seven_k', 'ten_k', "twenty_k", "over_twenty")))) + 
+  geom_bar(position="dodge", stat="identity") + 
+  theme_bw() + 
+  xlab("Income Cat")
+  
+
+mod1_mergedata_all_rounds %>%
+  tab_cols(ind_diarrhea_seek_care) %>%
+  tab_cells(total(), under_5, cat_sex, dist_quant, ind_have_any_trans, cat_income, ind_electricity) %>%
+  tab_cols(ind_diarrhea_seek_care ) %>%
+  tab_stat_rpct(total_label = "n responses") %>%
+  tab_cells(n_age) %>%
+  tab_stat_mean(label = "Mean (Years)") %>%
+  tab_stat_sd(label = "Std Dev (Years)") %>%
+  tab_pivot() %>%
+  htmlTable(caption = "Who Sought Care for a Diarrhea Case in the Last Month? (given they had diarrhea)")
+
+mod1_mergedata_all_rounds %>%
+  tab_cols(ind_diarrhea_seek_care) %>%
+  tab_cells(total(), under_5, cat_sex, dist_quant, ind_have_any_trans, cat_income, ind_electricity) %>%
+  tab_cols(ind_diarrhea_seek_care ) %>%
+  tab_stat_cases(total_label = "n responses") %>%
+  tab_cells(n_age) %>%
+  tab_stat_mean(label = "Mean (Years)") %>%
+  tab_stat_sd(label = "Std Dev (Years)") %>%
+  tab_pivot() %>%
+  htmlTable(caption = "Who Sought Care for a Diarrhea Case in the Last Month? (given they had diarrhea)")
+
+```
+
+
+### Explore outcome dynamics for those who had diarrhea in the last month, only in rounds 1a and 1b.
+
+* FINDINGS:
+  + 78 people experienced diarrhea in the last month, among them 37 people sought care and 41 did not. As severity of hypothetical symptoms increases people who said they wouldn't seek care and actually had diarrhea in the last month were more likely to not seek care. 
+  + It seems that older people, females, those that live in more rural environments, and those with higher incomes / any education were more likely to have diarrhea. The increased propensity in those with higher incomes and in those with any education could be a symptom of reporting bias...
+
+```{r echo = FALSE}
+
+mod1_mergedata_rounds_1ab_filtered_ind_diarrhea_month %>%
+  tab_cols(ind_diarrhea_month) %>%
+  tab_stat_unweighted_valid_n(label = "Total n") %>%
+  tab_cells(n_age) %>%
+  tab_stat_mean(label = "Mean (Years)") %>%
+  tab_stat_sd(label = "Std Dev (Years)") %>%
+  tab_cells(under_5, cat_sex, dist_quant, ind_have_any_trans, cat_income, cat_floors) %>%
+  tab_stat_rpct(total_statistic = "u_responses",total_row_position = "none", label = "(%)") %>%
+  tab_pivot() %>%
+  htmlTable(caption = "Who Had Diarrhea in the Last Month?")
+
+
+```
+
+What percentage of respondents had diarrhea in the last month?
+
+* FINDINGS: 
+  +3.3 %
+
+```{r echo = FALSE}
+
+cross_cpct_responses(mod1_mergedata_rounds_1ab_wdiaseek, ind_diarrhea_month)
+
+```
+
+Among those who had dia in the last month, what was their activity in the last month
+```{r echo = FALSE} 
+
+#table(yes_dia_in_last_month$cat_activity_month)
+
+cross_cases(yes_dia_in_last_month, cat_activity_month) 
+```
+
+__________________________________________________________________________________________________
+### Explore outcome dynamics for those who had diarrhea in the last month and sought care?
+
+```{r echo = FALSE}
+
+yes_dia_in_last_month %>%
+  tab_cols(ind_diarrhea_seek_care) %>%
+  tab_cells(total(), under_5, cat_sex, dist_quant, ind_have_any_trans, cat_income, cat_floors, which_hosp_closer, ind_electricity) %>%
+  tab_cols(ind_diarrhea_seek_care ) %>%
+  tab_stat_rpct(total_label = "n responses") %>%
+  tab_cells(n_age) %>%
+  tab_stat_mean(label = "Mean (Years)") %>%
+  tab_stat_sd(label = "Std Dev (Years)") %>%
+  tab_pivot() %>%
+  htmlTable(caption = "Who Sought Care for a Diarrhea Case in the Last Month? (given they had diarrhea)")
+
+
+```
+
+How do those that did or did not seek care respond to the question would they seek care?
+```{r echo = FALSE}
+#table(mod1_mergedata_rounds_1ab_wdiaseek$ind_diarrhea1_care, mod1_mergedata_rounds_1ab_wdiaseek$mod_ind_diarrhea_seek_care)
+
+#mod1_mergedata_rounds_1ab_wdiaseek %>% group_by(ind_diarrhea1_care) %>% count(mod_ind_diarrhea_seek_care, ind_diarrhea1_care) %>% filter(!is.na(mod_ind_diarrhea_seek_care)) %>% mutate(n = prop.table(n)) %>% pivot_wider(names_from=mod_ind_diarrhea_seek_care, values_from = n)
+
+cross_rpct(mod1_mergedata_rounds_1ab_wdiaseek, ind_diarrhea1_care, ind_diarrhea_seek_care, total_statistic = "u_responses")
+```
+
+
+How do those that did or did not seek care respond to the question would they seek care?
+```{r echo = FALSE}
+
+#table(mod1_mergedata_rounds_1ab_wdiaseek$ind_diarrhea2_care, mod1_mergedata_rounds_1ab_wdiaseek$mod_ind_diarrhea_seek_care)
+
+#mod1_mergedata_rounds_1ab_wdiaseek %>% group_by(ind_diarrhea2_care) %>% count(mod_ind_diarrhea_seek_care, ind_diarrhea2_care) %>% filter(!is.na(mod_ind_diarrhea_seek_care)) %>% mutate(n = prop.table(n)) %>% pivot_wider(names_from=mod_ind_diarrhea_seek_care, values_from = n)
+
+cross_rpct(mod1_mergedata_rounds_1ab_wdiaseek, ind_diarrhea2_care, ind_diarrhea_seek_care, total_statistic = "u_responses")
+```
+
+
+How do those that did or did not seek care respond to the question would they seek care?
+```{r echo = FALSE}
+#table(mod1_mergedata_rounds_1ab_wdiaseek$ind_diarrhea3_care, mod1_mergedata_rounds_1ab_wdiaseek$mod_ind_diarrhea_seek_care)
+
+#mod1_mergedata_rounds_1ab_wdiaseek %>% group_by(ind_diarrhea3_care) %>% count(mod_ind_diarrhea_seek_care, ind_diarrhea3_care) %>% filter(!is.na(mod_ind_diarrhea_seek_care)) %>% mutate(n = prop.table(n)) %>% pivot_wider(names_from=mod_ind_diarrhea_seek_care, values_from = n)
+
+cross_rpct(mod1_mergedata_rounds_1ab_wdiaseek, ind_diarrhea3_care, ind_diarrhea_seek_care, total_statistic = "u_responses")
+```
+
+* FINDINGS: 
+  + Looking at rounds 1a/b there are only about 68 people that answered the ind_diarrhea_seek_care question among those that answered yes to the ind_diarrhea_month question. Would it be prudent to bring in data from other rounds to boost the sample size? Looking at this small sample size, I have concerns about the validity of the ind_diarrhea1,2,3_care questions.
+
+__________________________________________________________________________________________________
+### Explore counts of categorical variables in rounds 1a and 1b.
+
+* FINDINGS: 
+  + 1759 people said yes to ind_diarrhea1_care, 1994 people said yes to ind_diarrhea2_care, 2190 people said yes to ind_diarrhea3_care.
+
+```{r echo = FALSE}
+
+
+mod1_mergedata_rounds_1ab %>%
+  tab_cols() %>%
+  tab_cells(under_5, cat_sex, ind_have_any_trans, cat_income, cat_floors, ind_diarrhea1_care, ind_diarrhea2_care, ind_diarrhea3_care, ind_electricity, ind_internet) %>%
+  tab_stat_cases(total_statistic = "u_responses") %>%
+  tab_pivot() %>%
+  htmlTable(caption = "Categorical Vairable Counts")
+
+
+```
+
+__________________________________________________________________________________________________
+### Look at what proportion of people that said they would seek care said yes to all 3 questions. 
+
+* FINDINGS: 
+  + It looks like 75% of the people that answered yes to any of the questions answered yes to all 3. 
+
+```{r echo = FALSE}
+#prop.table(table(mergedata_rounds_1ab_with_care_cat$diarrhea_care_cat))
+#table(mergedata_rounds_1ab_with_care_cat$diarrhea_care_cat)
+
+cross_cpct(mod1_mergedata_rounds_1ab, diarrhea_care_cat)
+```
+
+
+
+```{r echo = FALSE}
+
+#table(mod2_megredata_sansNA$diarrhea_care_cat, mod2_megredata_sansNA$cat_sex)
+#cross_cases(mod1_mergedata_rounds_1ab, diarrhea_care_cat, cat_sex) %>% set_caption("Diarrhea healthcare seeking categories stratified by sex (count).")
+#cross_rpct(mod1_mergedata_rounds_1ab, diarrhea_care_cat, cat_sex) %>% set_caption("Diarrhea healthcare seeking categories stratified by sex (%).")
+```
+
+
+Among those who said yes to ind_diarrhea1_care, how did they answer to 2 and 3 
+```{r echo = FALSE}
+
+dia1_yes_23comp = apply_labels(dia1_yes_23comp, 
+                               ind_diarrhea2_care = "Would you seek care for somewhat severe symptoms?",
+                               ind_diarrhea3_care = "Would you seek care for the most severe symptoms?"
+                               )
+
+cross_cases(dia1_yes_23comp, ind_diarrhea2_care, ind_diarrhea3_care) %>% set_caption("Among those who answered yes to ind_diarrhea1_care, how did they respond to ind_diarrhea2,care and ind_diarrhea3_care? (count)")
+#mod1_mergedata_rounds_1ab_wdiaseek %>% count(ind_diarrhea2_care, ind_diarrhea1_care) %>% group_by(ind_diarrhea1_care) %>% filter(!is.na(ind_diarrhea2_care)) %>% mutate(n = prop.table(n)) %>% pivot_wider(names_from=ind_diarrhea2_care, values_from = n)
+
+#mod1_mergedata_rounds_1ab_wdiaseek %>% count(ind_diarrhea3_care, ind_diarrhea1_care) %>% group_by(ind_diarrhea1_care) %>% filter(!is.na(ind_diarrhea3_care)) %>% mutate(n = prop.table(n)) %>% pivot_wider(names_from=ind_diarrhea3_care, values_from = n)
+```
+
+
+Among those who said no to ind_dia1_care, how did they answer to 2 and 3
+```{r echo = FALSE}
+
+dia1_no_23comp = apply_labels(dia1_no_23comp, 
+                               ind_diarrhea2_care = "Would you seek care for somewhat severe symptoms?",
+                               ind_diarrhea3_care = "Would you seek care for the most severe symptoms?"
+                               )
+
+cross_cases(dia1_no_23comp, ind_diarrhea2_care, ind_diarrhea3_care) %>% set_caption("Among those who answered no to ind_diarrhea1_care, how did they respond to ind_diarrhea2,care and ind_diarrhea3_care? (count)")
+
+```
+
+__________________________________________________________________________________________________
+### Look at distance from the port as a variable to indicate ubanicity of the household. 
+
+* Findings: 
+  + the mean distance from the port was 26.7 km. Among those who said yes to ind_diarrhea1_care the ave distance is 27.3 km. Among those who said no to ind_diarrhea1_care the ave distance is 24.8 km.
+
+
+What is the average distance from the households to the port for whole dataset
+```{r echo = FALSE}
+ 
+mean(mergedata_rounds_1ab$dist_port, na.rm=T)
+
+```
+
+What is the average distance from the households to the port for whose who answered that they would seek care (ind_diarrhea1_care)
+```{r echo = FALSE}
+
+mean(dia1_yes_23comp$dist_port, na.rm=T)
+#boxplot(dia1_yes_23comp$dist_port, na.rm=T)
+```
+
+What is the average distance from the households to the port for whose who answered that they would seek care (ind_diarrhea2_care)
+```{r echo = FALSE}
+
+mean(dia2_yes_23comp$dist_port, na.rm=T)
+#boxplot(dia1_yes_23comp$dist_port, na.rm=T)
+```
+
+
+What is the average distance from the households to the port for whose who answered that they would seek care (ind_diarrhea3_care)
+```{r echo = FALSE}
+
+mean(dia3_yes_23comp$dist_port, na.rm=T)
+#boxplot(dia1_yes_23comp$dist_port, na.rm=T)
+```
+
+```{r echo = FALSE}
+# Get IQR, median, quarantines and boxplot for dist_port for the whole data set 
+
+#IQR(mergedata_rounds_1ab$dist_port, na.rm=T)
+#median(mergedata_rounds_1ab$dist_port, na.rm=T)
+#quantile(mergedata_rounds_1ab$dist_port, na.rm=T)
+#boxplot(mergedata_rounds_1ab$dist_port, na.rm=T)
+```
+
+Alluvial plots for those who sought care based on ind_diarrhea1,2,3_care questions based on sex and quantile distance to the port of Chittagong.
+
+* Findings: 
+  + These plots indicate that as the severity of possible symptoms increases there is a roughly uniform increase in healthcare seeking behavior among the different sexes and among those that live in different levels of urban or peri-urban areas. 
+  
+```{r echo = FALSE}
+
+alluvial_data_ind_diarrhea1_care <- foralluv_healthseek_dia1_mergedata_rounds_1ab %>% filter(!is.na(cat_sex), !is.na(age_cat), !is.na(dist_quant), !is.na(ind_diarrhea1_care),!is.na(under_5)) %>%
+  group_by(ind_diarrhea1_care, cat_sex, age_cat, under_5, dist_quant) %>%
+  summarize(obs = n())
+
+alluvial_data_ind_diarrhea2_care <- foralluv_healthseek_dia2_mergedata_rounds_1ab %>% filter(!is.na(cat_sex), !is.na(age_cat), !is.na(dist_quant), !is.na(ind_diarrhea2_care),!is.na(under_5)) %>%
+  group_by(ind_diarrhea2_care, cat_sex, age_cat, under_5, dist_quant) %>%
+  summarize(obs = n())
+
+alluvial_data_ind_diarrhea3_care <- foralluv_healthseek_dia3_mergedata_rounds_1ab %>% filter(!is.na(cat_sex), !is.na(age_cat), !is.na(dist_quant), !is.na(ind_diarrhea3_care),!is.na(under_5)) %>%
+  group_by(ind_diarrhea3_care, cat_sex, age_cat, under_5, dist_quant) %>%
+  summarize(obs = n())
+
+
+alluvial_ind_dia1_care <- ggplot(as.data.frame(alluvial_data_ind_diarrhea1_care),
+       aes(y = obs, axis1 = cat_sex, axis2 = dist_quant)) +
+  geom_alluvium(aes(fill = ind_diarrhea1_care), width = 1/12) +
+  geom_stratum(width = 1/10, fill = "black", color = "grey") +
+  geom_label(stat = "stratum", aes(label = after_stat(stratum))) +
+  scale_x_discrete(limits = c("Sex", "dist_quant"), expand = c(.05, .05)) +
+  scale_fill_brewer(type = "qual", palette = "Set1") +
+  ggtitle("Alluvial Plot for Those Who Answered Yes to ind_diarrhea1_care")
+
+alluvial_ind_dia2_care <- ggplot(as.data.frame(alluvial_data_ind_diarrhea2_care),
+       aes(y = obs, axis1 = cat_sex, axis2 = dist_quant)) +
+  geom_alluvium(aes(fill = ind_diarrhea2_care), width = 1/12) +
+  geom_stratum(width = 1/10, fill = "black", color = "grey") +
+  geom_label(stat = "stratum", aes(label = after_stat(stratum))) +
+  scale_x_discrete(limits = c("Sex", "dist_quant"), expand = c(.05, .05)) +
+  scale_fill_brewer(type = "qual", palette = "Set1") +
+  ggtitle("Alluvial Plot for Those Who Answered Yes to ind_diarrhea2_care")
+
+alluvial_ind_dia3_care <- ggplot(as.data.frame(alluvial_data_ind_diarrhea3_care),
+       aes(y = obs, axis1 = cat_sex, axis2 = dist_quant)) +
+  geom_alluvium(aes(fill = ind_diarrhea3_care), width = 1/12) +
+  geom_stratum(width = 1/10, fill = "black", color = "grey") +
+  geom_label(stat = "stratum", aes(label = after_stat(stratum))) +
+  scale_x_discrete(limits = c("Sex", "dist_quant"), expand = c(.05, .05)) +
+  scale_fill_brewer(type = "qual", palette = "Set1") +
+  ggtitle("Alluvial Plot for Those Who Answered Yes to ind_diarrhea3_care")
+
+alluvial_ind_dia1_care
+alluvial_ind_dia2_care
+alluvial_ind_dia3_care
+
+```
+
+Make a bar plot for HC seeking by age. 
+
+* Findings: 
+  + 
+
+```{r}
+mod_1_mergedata_bar_dist_under5 <- mod1_mergedata_rounds_1ab %>% group_by(under_5) %>% count(under_5, ind_diarrhea1_care) %>% filter(!is.na(ind_diarrhea1_care)) %>% filter(!is.na(under_5)) %>% mutate(n = prop.table(n)) %>% mutate(dia_question = "ind_diarrhea1_care") %>% filter(ind_diarrhea1_care %in% "yes") %>% select(-ind_diarrhea1_care)
+
+mod_1_mergedata_bar1_dist_under5 <- mod1_mergedata_rounds_1ab %>% group_by(under_5) %>% count(under_5, ind_diarrhea2_care) %>% filter(!is.na(ind_diarrhea2_care)) %>% filter(!is.na(under_5)) %>% mutate(n = prop.table(n)) %>% mutate (dia_question = "ind_diarrhea2_care") %>% filter(ind_diarrhea2_care %in% "yes") %>% select(-ind_diarrhea2_care)
+
+mod_1_mergedata_bar2_dist_under5 <- mod1_mergedata_rounds_1ab %>% group_by(under_5) %>% count(under_5, ind_diarrhea3_care) %>% filter(!is.na(ind_diarrhea3_care)) %>% filter(!is.na(under_5)) %>% mutate(n = prop.table(n)) %>% mutate (dia_question = "ind_diarrhea3_care") %>% filter(ind_diarrhea3_care %in% "yes") %>% select(-ind_diarrhea3_care)
+
+grouped_bar_inc_final_dist_under5 <- bind_rows(mod_1_mergedata_bar_dist_under5, mod_1_mergedata_bar1_dist_under5, mod_1_mergedata_bar2_dist_under5)
+
+ggplot(grouped_bar_inc_final_dist_under5, aes(fill= under_5 ,y=n, x=dia_question)) + 
+    geom_bar(position="dodge", stat="identity") + theme_bw()
+
+
+```
+
+
+
+Make a bar plot for HC seeking by dist quant. 
+
+* Findings: 
+  + It looks like the most rural quant has the highest HC seeking 
+```{r}
+mod_1_mergedata_bar_dist <- mod1_mergedata_rounds_1ab %>% group_by(dist_quant) %>% count(dist_quant, ind_diarrhea1_care) %>% filter(!is.na(ind_diarrhea1_care)) %>% filter(!is.na(dist_quant)) %>% mutate(n = prop.table(n)) %>% mutate(dia_question = "ind_diarrhea1_care") %>% filter(ind_diarrhea1_care %in% "yes") %>% select(-ind_diarrhea1_care)
+
+mod_1_mergedata_bar1_dist <- mod1_mergedata_rounds_1ab %>% group_by(dist_quant) %>% count(dist_quant, ind_diarrhea2_care) %>% filter(!is.na(ind_diarrhea2_care)) %>% filter(!is.na(dist_quant)) %>% mutate(n = prop.table(n)) %>% mutate (dia_question = "ind_diarrhea2_care") %>% filter(ind_diarrhea2_care %in% "yes") %>% select(-ind_diarrhea2_care)
+
+mod_1_mergedata_bar2_dist <- mod1_mergedata_rounds_1ab %>% group_by(dist_quant) %>% count(dist_quant, ind_diarrhea3_care) %>% filter(!is.na(ind_diarrhea3_care)) %>% filter(!is.na(dist_quant)) %>% mutate(n = prop.table(n)) %>% mutate (dia_question = "ind_diarrhea3_care") %>% filter(ind_diarrhea3_care %in% "yes") %>% select(-ind_diarrhea3_care)
+
+grouped_bar_inc_final_dist <- bind_rows(mod_1_mergedata_bar_dist, mod_1_mergedata_bar1_dist, mod_1_mergedata_bar2_dist)
+
+ggplot(grouped_bar_inc_final_dist, aes(fill= dia_question ,y=n, x=dist_quant)) + 
+    geom_bar(position="dodge", stat="identity") + theme_bw()
+
+
+```
+
+
+__________________________________________________________________________________________________
+### Compare characteristics of respondents based on answers to ind_diarrhea1_care vs ind_diarrhea2_care vs ind_diarrhea3_care
+
+```{r echo = F}
+
+mod1_mergedata_rounds_1ab_filtered %>%
+  tab_cells(under_5, cat_sex, dist_quant, ind_have_any_trans, cat_income) %>%
+  tab_cols(ind_diarrhea1_care, ind_diarrhea2_care, ind_diarrhea3_care) %>%
+  tab_stat_rpct(total_statistic = "u_responses") %>%
+  tab_pivot() %>%
+  htmlTable(caption = "Different characteristics of Hypothetical Healthseeking Behavior")
+
+
+
+```
+__________________________________________________________________________________________________
+### Explore the characteristics of those who answered yes or no to ind_diarrhea1_care
+
+* Findings: 
+  + About 20 percent of people who said they would seek care (ind_diarrhea1_care) would do so at either BITID or SUHC. 15% of the overall data set said they would. 
+  + There doesn't seem to be a diff in age between those who would or wouldn't seek care at our hosps but people under 5 years of age were more likely to seek care at either BITID or SUHC when compared to people over 5. 
+  + It seems that those who said that they would seek care at our hospital lived closer to the port than those that said that they wouldn't. However, as symptom severity increases, distance to port is similar between those who said they would seek care at one of our hospitals and those who said that they wouldn't.
+  + People under 5 years of age were more likely to seek care for the least severe case when compared to people over 5.
+
+Overall descriptive tables / graphs
+```{r echo = F}
+
+mod1_mergedata_rounds_1ab %>%
+  tab_cols(ind_diarrhea1_care) %>%
+  tab_cells(n_age) %>%
+  tab_stat_mean_sd_n() %>%
+  tab_cells(total(),under_5, cat_sex, dist_quant, ind_have_any_trans, which_hosp_closer, cat_income, Income_over_7K, Income_over_10K, Income_over_20K, cat_floors, cat_activity_month) %>%
+  tab_stat_rpct(total_row_position = "none", label = "(%)") %>%
+  tab_stat_cases() %>%
+  tab_pivot() %>%
+  htmlTable(caption = "Different characteristics of those who answered ind_diarrhea1_care")
+
+```
+
+
+Where are people seeking care, given that they answered yes to ind_diarrhea1_care, in the whole dataset??
+```{r echo = FALSE}
+
+#count(yes_to_ind_diarrhea1_care,cat_diarrhea1_site)
+
+cross_cases(yes_to_ind_diarrhea1_care, cat_diarrhea1_site) %>% htmlTable(caption = "Count of people seek care diff facilities ind_diarrhea1_care = yes")
+
+cross_cpct_responses(yes_to_ind_diarrhea1_care, cat_diarrhea1_site) %>% htmlTable(caption = "% of people seek care diff facilities ind_diarrhea1_care = yes")
+
+cross_cpct_responses(yes_to_ind_diarrhea1_care, diarrhea1_seek_at_our_hosps) %>% htmlTable(caption = "% of people seek care at our hosps given ind_diarrhea1_care = yes")
+
+cross_cpct_responses(mod1_mergedata_rounds_1ab, diarrhea1_seek_at_our_hosps) %>% htmlTable(caption = "Overall % of people seek care at our hosps for entire dataset") 
+
+```
+
+
+What is the % of reasons people would seek care at a different facilities? note that if diarrhea1_seek_at_pharm = no then that indicates they would seek care at a hospital. 
+```{r echo = FALSE}
+
+yes_to_ind_diarrhea1_care %>%
+  tab_cells(cat_diarrhea1_reason) %>%
+  tab_cols(total(), diarrhea1_seek_at_our_hosps, diarrhea1_seek_at_pharm) %>%
+  tab_stat_cpct_responses() %>%
+  tab_pivot() %>%
+  htmlTable(caption = "Reasons for seeking care at different facilities")
+
+```
+
+What is the mean age of those who said they would or would not seek care at our hospitals (BITID or SUHC) among those that answered yes to ind_diarrhea1_care
+```{r echo = FALSE}
+
+#mean(yes_to_ind_diarrhea1_care_yes_our_hosp$n_age, na.rm = T)
+
+#mod1_mergedata_rounds_1ab %>% filter(!is.na(n_age), !is.na(diarrhea1_seek_at_our_hosps)) %>% group_by(diarrhea1_seek_at_our_hosps) %>% mean(n_age) 
+
+mod1_mergedata_rounds_1ab %>%
+  tab_cells(n_age) %>%
+  tab_cols(diarrhea1_seek_at_our_hosps) %>%
+  tab_stat_mean_sd_n() %>%
+  tab_pivot() %>%
+  htmlTable(caption = "Average age of those who sought care at our hosps")
+
+```
+
+What proportion of each age group sought care per ind_diarrhea1_care?
+```{r echo = FALSE}
+ 
+#mod1_mergedata_rounds_1ab %>% count(age_cat, ind_diarrhea1_care) %>% filter(!is.na(age_cat), !is.na(ind_diarrhea1_care)) %>% group_by(age_cat) %>% mutate(n = prop.table(n)) %>% pivot_wider(names_from=ind_diarrhea1_care, values_from = n)
+
+cross_cpct_responses(mod1_mergedata_rounds_1ab, ind_diarrhea1_care, age_cat)
+
+```
+
+Look at the proportion of people who would seek care for the least severe case at either BITID or SUHC (diarrhea1_seek_at_our_hosps) among those who are over 5 or under 5
+
+* FINDINGS:
+  +  People under 5 years of age were more likely to seek care at either BITID or SUHC when compared to people over 5 
+```{r echo = FALSE}
+
+#healthseek_dia1_mergedata_rounds_1ab %>% count(under_5, diarrhea1_seek_at_our_hosps) %>% group_by(under_5) %>% filter(!is.na(under_5), !is.na(diarrhea1_seek_at_our_hosps)) %>% mutate(n = prop.table(n)) %>% pivot_wider(names_from=diarrhea1_seek_at_our_hosps, values_from = n)
+
+cross_rpct(healthseek_dia1_mergedata_rounds_1ab, under_5, diarrhea1_seek_at_our_hosps)
+```
+
+
+
+```{r echo = FALSE}
+
+#ind_our_hosp1_by_age_cat <- mod1_mergedata_rounds_1ab %>% count(age_cat, diarrhea1_seek_at_our_hosps) %>% group_by(age_cat) %>% mutate(n = prop.table(n)) %>% pivot_wider(names_from=diarrhea1_seek_at_our_hosps, values_from = n) %>% filter(!is.na(age_cat))
+
+#our_hosp_barplot_prop_1 <- ggplot(data=ind_our_hosp1_by_age_cat, aes(x = age_cat, y = yes)) + geom_bar(stat = "identity") + ggtitle("Proportion of people that would go to our hosps given yes to ind_diarrhea1_care")
+
+#our_hosp_barplot_prop_1
+```
+
+
+Look at the proportion of people who would seek care for the least severe case (ind_diarrhea1_care) among those who are over 5 or under 5, among those who are over 4 or under 4, among those who are over 3 or under 3, among those who are over 2 or under 2
+
+* FINDINGS:
+  + People under 5 years of age were more likely to seek care for the least severe case when compared to people over 5 - same for under and over 4 - ~85% of people under 5 0r 4 would seek care compared to ~ 75% of people over 5 or 4
+  + People under 2 years of age were slightly more likely to seek care at either BITID or SUHC when compared to people over 2 - ~83% of people under 5 0r 4 would seek care compared to ~ 75% of people over 5 or 4
+```{r echo = FALSE}
+
+#healthseek_dia1_mergedata_rounds_1ab %>% count(under_5, ind_diarrhea1_care) %>% group_by(under_5) %>% filter(!is.na(under_5), !is.na(ind_diarrhea1_care)) %>% mutate(n = prop.table(n)) %>% pivot_wider(names_from=ind_diarrhea1_care, values_from = n)
+
+cross_rpct(mod1_mergedata_rounds_1ab, under_5, ind_diarrhea1_care)
+
+cross_rpct(mod1_mergedata_rounds_1ab, under_4, ind_diarrhea1_care)
+
+cross_rpct(mod1_mergedata_rounds_1ab, under_3, ind_diarrhea1_care)
+
+cross_rpct(mod1_mergedata_rounds_1ab, under_2, ind_diarrhea1_care)
+```
+
+Plot proportion of 5 year age groups that would answer yes to ind_diarrhea1_care
+
+* FINDINGS:
+  + These age categories doesn't seem to be a factor in why people answer yes to ind_diarrhea1_care, although the (0,6] group does have the highest proportion of positive respondents)
+```{r echo = FALSE}
+
+ind_dia1_by_age_cat <- mod1_mergedata_rounds_1ab %>% count(age_cat, ind_diarrhea1_care) %>% group_by(age_cat) %>% mutate(n = prop.table(n)) %>% pivot_wider(names_from=ind_diarrhea1_care, values_from = n) %>% filter(!is.na(age_cat))
+
+barplot_prop_1 <- ggplot(data=ind_dia1_by_age_cat, aes(x = age_cat, y = yes)) + geom_bar(stat = "identity") + ggtitle("Proportion of people that would seek care (answer yes to ind_diarrhea1_care)")
+
+barplot_prop_1
+
+```
+
+
+Look at the proportion of people who would seek care for the least severe case at either BITID or SUHC (diarrhea1_seek_at_our_hosps) among those who are over 2 or under 2
+
+* FINDINGS:
+  +  People under 2 years of age were slightly more likely to seek care at either BITID or SUHC when compared to people over 2 
+```{r echo = FALSE}
+
+healthseek_dia1_mergedata_rounds_1ab %>% count(under_2, diarrhea1_seek_at_our_hosps) %>% group_by(under_2) %>% filter(!is.na(under_2), !is.na(diarrhea1_seek_at_our_hosps)) %>% mutate(n = prop.table(n)) %>% pivot_wider(names_from=diarrhea1_seek_at_our_hosps, values_from = n)
+
+cross_rpct(healthseek_dia1_mergedata_rounds_1ab, under_2, ind_diarrhea1_care)
+```
+
+Explore education as a variable only among those that are over 18 
+
+* Findings 
+  + Among those that are oevr 18 years of age people with any education said they would seek care 77% of the time while those without any education would seek cvare 66% of the time 
+```{r echo = FALSE}
+
+cross_rpct(mod1_mergedata_rounds_1ab_sans_indedu_decline, ind_edu_school, ind_diarrhea1_care, under_18)
+
+```
+__________________________________________________________________________________________________
+### Explore the characteristics of those who answered yes to ind_diarrhea2_care
+
+* FINDINGS:
+  + About 30 percent of people who said they would seek care (ind_diarrhea2_care) would do so at either BITID or SUHC. 
+  + As severity increases from ind_diarrhea1_care to ind_diarrhea2_care people are more likely to to go to the either BITID or SUHC and the previously noted difference between those under and over 5 has become negligible.
+  + Both under 5s and over 5s are about 10% more likely to seek care for the mid range of severity when compared to the more mild case definition. 
+
+Overall descriptive tables / graphs
+```{r echo = FALSE}
+
+mod1_mergedata_rounds_1ab %>%
+  tab_cells(total(),under_5, cat_sex, dist_quant, ind_have_any_trans, which_hosp_closer, cat_income, Income_over_7K, Income_over_10K, Income_over_20K, cat_floors, cat_activity_month) %>%
+  tab_cols(ind_diarrhea2_care) %>%
+  tab_stat_rpct(label = "%") %>%
+  tab_stat_cases(label = "count") %>%
+  tab_pivot() %>%
+  htmlTable(caption = "Different characteristics of those who answered yes to ind_diarrhea2_care")
+
+
+yes_to_ind_diarrhea2_care %>%
+  tab_cells(under_5, cat_sex, dist_quant, ind_have_any_trans) %>%
+  tab_cols(diarrhea2_seek_at_our_hosps, diarrhea2_seek_at_pharm ) %>%
+  tab_stat_rpct() %>%
+  tab_pivot() 
+
+#str(yes_to_ind_diarrhea2_care)
+```
+
+
+What is the mean age among those who answered yes to ind_diarrhea2_care? 
+```{r echo = FALSE}
+
+mod1_mergedata_rounds_1ab %>%
+  tab_cells(n_age) %>%
+  tab_cols(total(), ind_diarrhea2_care) %>%
+  tab_stat_mean_sd_n() %>%
+  tab_last_sig_means() %>%
+  tab_pivot() %>%
+  set_caption("Average age of respondents to ind_diarrhea2_care")
+```
+
+
+What facilites would people utilize to seek care? 
+```{r echo = FALSE}
+
+#count(yes_to_ind_diarrhea2_care,cat_diarrhea2_site)
+
+cross_cases(yes_to_ind_diarrhea2_care, cat_diarrhea2_site) %>% htmlTable(caption = "Count of people seek care diff facilities ind_diarrhea2_care = yes")
+
+cross_cpct_responses(yes_to_ind_diarrhea2_care, cat_diarrhea2_site)
+cross_cpct_responses(yes_to_ind_diarrhea2_care, diarrhea2_seek_at_our_hosps)
+cross_cpct_responses(yes_to_ind_diarrhea2_care, diarrhea2_seek_at_pharm)
+
+```
+
+What is the mean age of those who said they would seek care at out hospitals among those that answered yes to ind_diarrhea2_care? What is the mean age of those who said they would not seek care at out hospitals among those that answered yes to ind_diarrhea2_care?
+```{r echo = FALSE}
+
+yes_to_ind_diarrhea2_care %>%
+  tab_cells(n_age) %>%
+  tab_cols(total(), diarrhea2_seek_at_our_hosps, diarrhea2_seek_at_pharm ) %>%
+  tab_stat_mean_sd_n() %>%
+  tab_last_sig_means() %>%
+  tab_pivot() %>%
+  set_caption("Average age of those who answered yes to ind_diarrhea2_care")
+
+```
+
+What is proportion of reasons people would seek care at a different facilities? note that if diarrhea2_seek_at_pharm = no then that indicates they would seek care at a hospital. 
+```{r echo = FALSE}
+
+yes_to_ind_diarrhea2_care %>%
+  tab_cells(cat_diarrhea2_reason) %>%
+  tab_cols(total(), diarrhea2_seek_at_our_hosps, diarrhea2_seek_at_pharm) %>%
+  tab_stat_cpct_responses() %>%
+  tab_pivot() %>%
+  set_caption("Reasons for seeking care at different facilities")
+```
+
+What is the mean age of those who said they would not seek care at out hospitals among those that answered yes to ind_diarrhea2_care
+```{r echo = FALSE}
+
+mean2_no_ourhosp <- mean(yes_to_ind_diarrhea2_care_no_our_hosp$dist_port, na.rm = T)
+mean2_no_ourhosp 
+```
+
+What proportion of each age group sought care per ind_diarrhea2_care? 
+
+* FINDINGS:
+  + People under 5 years of age were not more likely to seek care at either BITID or SUHC when compared to people over 5 
+```{r echo = FALSE}
+
+#mod1_mergedata_rounds_1ab %>% count(age_cat, ind_diarrhea2_care) %>% group_by(age_cat) %>% mutate(n = prop.table(n)) %>% pivot_wider(names_from=ind_diarrhea2_care, values_from = n)
+
+mod1_mergedata_rounds_1ab %>%
+  tab_cells(age_cat, under_10, under_5, under_4, under_3, under_2) %>%
+  tab_cols(total(), ind_diarrhea2_care) %>%
+  tab_stat_rpct() %>%
+  tab_pivot() %>%
+  set_caption("Examining care seeking within different age groups (%)")
+
+mod1_mergedata_rounds_1ab %>%
+  tab_cells(age_cat, under_10, under_5, under_4, under_3, under_2) %>%
+  tab_cols(total(), ind_diarrhea2_care) %>%
+  tab_stat_cases() %>%
+  tab_pivot() %>%
+  set_caption("Examining care seeking within different age groups (counts)")
+```
+
+Look at the proportion of people who would seek care for the mid level case at either BITID or SUHC (diarrhea2_seek_at_our_hosps) among those who are over 5 or under 5
+
+* FINDINGS:
+  + People under 5 years of age were not more likely to seek care at either BITID or SUHC when compared to people over 5 
+```{r echo = FALSE}
+
+healthseek_dia2_mergedata_rounds_1ab %>% count(under_5, diarrhea2_seek_at_our_hosps) %>% group_by(under_5) %>% filter(!is.na(under_5), !is.na(diarrhea2_seek_at_our_hosps)) %>% mutate(n = prop.table(n)) %>% pivot_wider(names_from=diarrhea2_seek_at_our_hosps, values_from = n)
+
+
+```
+
+Plot proportion of 5 year age groups that would answer yes to diarrhea2_seek_at_our_hosps, among those that answered yes to ind_diarrhea2_care. 
+
+* FINDINGS:
+  + People seem equally likely to seek care at one of our hosps regardless of age. 
+  
+```{r echo = FALSE}
+
+ind_our_hosp2_by_age_cat <- mod1_mergedata_rounds_1ab %>% count(age_cat, diarrhea2_seek_at_our_hosps) %>% group_by(age_cat) %>% mutate(n = prop.table(n)) %>% pivot_wider(names_from=diarrhea2_seek_at_our_hosps, values_from = n) %>% filter(!is.na(age_cat))
+
+our_hosp_barplot_prop_2 <- ggplot(data=ind_our_hosp2_by_age_cat, aes(x = age_cat, y = yes)) + geom_bar(stat = "identity") 
+
+our_hosp_barplot_prop_2
+```
+
+Plot proportion of 5 year age groups that would answer yes to ind_diarrhea2_care
+
+* FINDINGS:
+  + Under 5s seem more likely to seek care.
+  
+```{r echo = FALSE}
+
+ind_dia2_by_age_cat <- mod1_mergedata_rounds_1ab %>% count(age_cat, ind_diarrhea2_care) %>% group_by(age_cat) %>% mutate(n = prop.table(n)) %>% pivot_wider(names_from=ind_diarrhea2_care, values_from = n) %>% filter(!is.na(age_cat))
+
+barplot_prop_2 <- ggplot(data=ind_dia2_by_age_cat, aes(x = age_cat, y = yes)) + geom_bar(stat = "identity")
+
+barplot_prop_2
+
+```
+
+Plot proportion of 5 year age groups that would seek care at a pharmacy. 
+
+* FINDINGS:
+  + Under 5s seem more likely to seek care at a pharmacy than over 5s. 
+
+```{r echo = FALSE}
+
+ind_pharm2_by_age_cat <- mod1_mergedata_rounds_1ab %>% count(age_cat, diarrhea2_seek_at_pharm) %>% group_by(age_cat) %>% mutate(n = prop.table(n)) %>% pivot_wider(names_from=diarrhea2_seek_at_pharm, values_from = n) %>% filter(!is.na(age_cat))
+
+pharm_barplot_prop_2 <- ggplot(data=ind_pharm2_by_age_cat, aes(x = age_cat, y = yes)) + geom_bar(stat = "identity") 
+
+pharm_barplot_prop_2
+
+```
+
+Explore education as a variable only among those that are over 18 
+
+* Findings 
+  + Among those that are over 18 years of age people with any education said they would seek care 87% of the time while those without any education would seek care 79% of the time 
+```{r echo = FALSE}
+
+cross_rpct(mod1_mergedata_rounds_1ab_sans_indedu_decline, ind_edu_school, ind_diarrhea2_care, under_18)
+
+```
+
+__________________________________________________________________________________________________
+### Explore the characteristics of those who answered yes to ind_diarrhea3_care 
+
+Overall descriptive tables / graphs
+```{r echo = F}
+
+yes_to_ind_diarrhea3_care %>%
+  tab_cells(total(),under_5, cat_sex, dist_quant, ind_have_any_trans, which_hosp_closer, cat_income, Income_over_7K, Income_over_10K, Income_over_20K, cat_floors, cat_activity_month) %>%
+  tab_cols(total(), diarrhea3_seek_at_our_hosps, diarrhea3_seek_at_pharm ) %>%
+  tab_stat_rpct() %>%
+  tab_pivot() %>%
+  set_caption("Different characteristics of those who answered yes to ind_diarrhea3_care")
+
+```
+
+
+```{r echo = F}
+
+healthseek_dia3_mergedata_rounds_1ab = apply_labels(healthseek_dia3_mergedata_rounds_1ab,
+                                                    under_5 = "Under 5 Years of Age",
+                                                    ind_diarrhea3_care = "Would you seek care for the most severe symptoms?")
+
+```
+
+* Findings: 
+  + About 46 percent of people who said they would seek care (ind_diarrhea3_care) would do so at either BITID or SUHC.
+  + The difference between under 5 and over 5 care seeking behavior is less for the most severe cases but it is still there (diff is about 4%). People are more likely to seek care though for a more severe case. 
+
+What is the mean age
+```{r echo = FALSE}
+
+mean(yes_to_ind_diarrhea3_care$n_age, na.rm=T)
+
+```
+
+What is the mean distance to the port
+```{r echo = FALSE}
+
+mean(yes_to_ind_diarrhea3_care$dist_port, na.rm=T)
+```
+
+What is proportion of facilitates people would seek care?
+
+* Findings: 
+  + Most people wither sought care at BITID, SUHC, or a pharmacy. 
+  
+```{r echo = FALSE}
+
+cross_cases(yes_to_ind_diarrhea3_care, cat_diarrhea3_site) %>% htmlTable(caption = "Count of people seek care diff facilities ind_diarrhea3_care = yes")
+
+cross_cpct_responses(yes_to_ind_diarrhea3_care, cat_diarrhea3_site) 
+
+cross_cpct_responses(yes_to_ind_diarrhea3_care, diarrhea3_seek_at_our_hosps) 
+
+cross_cpct_responses(yes_to_ind_diarrhea3_care, diarrhea3_seek_at_pharm) 
+
+
+```
+
+What is proportion of reasons people would seek care at a particular facility?
+  
+```{r echo = FALSE}
+
+yes_to_ind_diarrhea3_care %>%
+  tab_cells(cat_diarrhea3_reason) %>%
+  tab_cols(total(), diarrhea3_seek_at_our_hosps, diarrhea3_seek_at_pharm ) %>%
+  tab_stat_cpct_responses() %>%
+  tab_pivot() %>%
+  set_caption("Reasons people seek care at our hospital or pharmacies (%)")
+
+```
+
+what is the mean age of those who said they would not seek care at out hospitals among those that answered yes to ind_diarrhea3_care
+```{r echo = FALSE}
+
+mean3_no_ourhosp <- mean(yes_to_ind_diarrhea3_care_no_our_hosp$dist_port, na.rm = T)
+mean3_no_ourhosp 
+```
+
+Plot proportion of 5 year age groups that would answer yes to diarrhea3_seek_at_our_hosps
+```{r echo = FALSE}
+
+ind_our_hosp3_by_age_cat <- mod1_mergedata_rounds_1ab %>% count(age_cat, diarrhea3_seek_at_our_hosps) %>% group_by(age_cat) %>% mutate(n = prop.table(n)) %>% pivot_wider(names_from=diarrhea3_seek_at_our_hosps, values_from = n) %>% filter(!is.na(age_cat))
+
+our_hosp_barplot_prop_3 <- ggplot(data=ind_our_hosp3_by_age_cat, aes(x = age_cat, y = yes)) + geom_bar(stat = "identity")
+
+our_hosp_barplot_prop_3
+```
+
+What proportion of each age group sought care per ind_diarrhea3_care? 
+
+* FINDINGS:
+  + People under 5 years of age were more likely to seek care when compared to people over 5
+  
+```{r echo = FALSE}
+
+#mod1_mergedata_rounds_1ab %>% count(age_cat, ind_diarrhea3_care) %>% group_by(age_cat) %>% mutate(n = prop.table(n)) %>% pivot_wider(names_from=ind_diarrhea3_care, values_from = n)
+
+mod1_mergedata_rounds_1ab %>%
+  tab_cells(age_cat, under_10, under_5, under_4, under_3, under_2) %>%
+  tab_cols(total(), ind_diarrhea3_care) %>%
+  tab_stat_rpct() %>%
+  tab_pivot() %>%
+  set_caption("Examining care seeking within different age groups (%)")
+
+mod1_mergedata_rounds_1ab %>%
+  tab_cells(age_cat, under_10, under_5, under_4, under_3, under_2) %>%
+  tab_cols(total(), ind_diarrhea3_care) %>%
+  tab_stat_cases() %>%
+  tab_pivot() %>%
+  set_caption("Examining care seeking within different age groups (counts)")
+```
+
+
+Plot proportion of 5 year age groups that would answer yes to ind_diarrhea3_care
+
+* FINDINGS:
+  + looks like age does not really affect who answers yes to ind_diarrhea3_care. 
+```{r echo = FALSE}
+
+ind_dia3_by_age_cat <- mod1_mergedata_rounds_1ab %>% count(age_cat, ind_diarrhea3_care) %>% group_by(age_cat) %>% mutate(n = prop.table(n)) %>% pivot_wider(names_from=ind_diarrhea3_care, values_from = n) %>% filter(!is.na(age_cat))
+
+barplot_prop_3 <- ggplot(data=ind_dia3_by_age_cat, aes(x = age_cat, y = yes)) + geom_bar(stat = "identity")
+
+barplot_prop_3
+
+```
+
+Explore education as a variable only among those that are over 18 
+
+* Findings 
+  + Among those that are over 18 years of age people with any education said they would seek care 95% of the time while those without any education would seek care 91% of the time 
+```{r echo = FALSE}
+
+cross_rpct(mod1_mergedata_rounds_1ab_sans_indedu_decline, ind_edu_school, ind_diarrhea3_care, under_18)
+
+```
+
+__________________________________________________________________________________________________
+### Look at how sex affects someones response to the seek care (ind_diarrhea1,2,3_care) questions
+
+* FINDINGS: 
+  + It looks like sex doesn't affect the positive or negative response proportions to the three questions
+
+Look at how groups stratified by sex respond to the ind_diarrhea1_care question, NAs removed 
+```{r echo = FALSE}
+
+cross_rpct(mod1_mergedata_rounds_1ab, cat_sex, ind_diarrhea1_care)
+
+```
+
+Look at how groups stratified by sex respond to the ind_diarrhea2_care question, NAs removed
+```{r echo = FALSE}
+
+cross_rpct(mod1_mergedata_rounds_1ab, cat_sex, ind_diarrhea2_care)
+
+```
+
+Look at how groups stratified by sex respond to the ind_diarrhea3_care question, NAs removed
+```{r echo = FALSE}
+
+cross_rpct(mod1_mergedata_rounds_1ab, cat_sex, ind_diarrhea3_care)
+
+```
+
+__________________________________________________________________________________________________
+### Explore the proportion of those over or under 5 that would seek care at either BITID or SUHC
+
+Among those under 5 and over_5 who responded yes to ind_diarrhea1_care, how many would seek care at either BITID or SUHC
+```{r echo = FALSE}
+
+#NOTE that one person responded NA to cat_diarrhea1_site and that this was turned into a "no" in the diarrhea1_seek_at_our_hosps column 
+#prop.table(table(yes_to_ind_diarrhea1_care_under5$under_5, yes_to_ind_diarrhea1_care_under5$diarrhea1_seek_at_our_hosps))
+
+cross_rpct(yes_to_ind_diarrhea1_care, under_5, diarrhea1_seek_at_our_hosps)
+
+```
+
+Among those under 5 and over_5 who responded yes to ind_diarrhea2_care, how many would seek care at either BITID or SUHC
+```{r echo = FALSE}
+
+cross_rpct(yes_to_ind_diarrhea2_care, under_5, diarrhea2_seek_at_our_hosps)
+
+```
+
+Among those under 5 and over_5 who responded yes to ind_diarrhea3_care, how many would seek care at either BITID or SUHC
+```{r echo = FALSE}
+
+cross_rpct(yes_to_ind_diarrhea3_care, under_5, diarrhea3_seek_at_our_hosps)
+
+```
+
+```{r echo = FALSE}
+#Among age cats who responded yes to ind_diarrhea1_care, how many would seek care at either BITID or SUHC
+#NOTE that one person responded NA to cat_diarrhea1_site and that this was turned into a "no" in the diarrhea1_seek_at_our_hosps column 
+#prop.table(table(yes_to_ind_diarrhea1_care$age_cat, yes_to_ind_diarrhea1_care$diarrhea1_seek_at_our_hosps))
+```
+
+```{r echo = FALSE}
+#Among age cats who responded yes to ind_diarrhea2_care, how many would seek care at either BITID or SUHC
+#prop.table(table(yes_to_ind_diarrhea2_care$age_cat, yes_to_ind_diarrhea2_care$diarrhea2_seek_at_our_hosps))
+```
+
+```{r echo = FALSE}
+
+#Notes to self / junk code:
+
+
+#Among age cats who responded yes to ind_diarrhea3_care, how many would seek care at either BITID or SUHC - use subsetting 
+#prop.table(table(yes_to_ind_diarrhea3_care$age_cat, yes_to_ind_diarrhea3_care$diarrhea3_seek_at_our_hosps))
+
+mean(yes_to_ind_diarrhea3_care$n_age[yes_to_ind_diarrhea3_care$diarrhea3_seek_at_our_hosps == "yes" & !is.na(yes_to_ind_diarrhea3_care$n_age)], na.rm=T)
+     
+     ### look into subsetting 
+
+#mean(yes_to_ind_diarrhea3_care$n_age[yes_to_ind_diarrhea3_care$diarrhea3_seek_at_our_hosps == "yes"], na.rm=T)
+```
+
+__________________________________________________________________________________________________
+### Explore care seeking at pharmacies and other facilites 
+
+What proportion of those that said they would seek care at a pharmacy (=1) are male vs female and how does that compare to the proportion of males to females among those who said they would go to a health facility (=0)? (Among those who answered yes to ind_diarrhea1_care)
+
+* FINDINGS:
+  + There is no difference in outcome based on sex among those who would experience the least severe symptoms
+  + As severity increases males are more likely to go to a pharmacy when compared to females. 
+  
+```{r echo = F}
+
+#mod1_mergedata_rounds_1ab_sansNA_cat_diarrhea1_site_pharmacy <- mod1_mergedata_rounds_1ab %>% filter(!is.na(cat_diarrhea1_site_pharmacy))
+
+#cross_rpct(healthseek_dia1_mergedata_rounds_1ab, cat_sex, diarrhea1_seek_at_pharm, total_statistic = "u_responses")
+
+#cross_rpct(mod1_mergedata_rounds_1ab_sansNA_cat_diarrhea1_site_pharmacy, cat_sex, diarrhea1_seek_at_pharm, total_statistic = "u_responses")
+
+#cross_rpct(mod1_mergedata_rounds_1ab, cat_sex, cat_diarrhea1_site_pharmacy, total_statistic = "u_responses")
+
+
+mod1_mergedata_rounds_1ab %>%
+  tab_cols(cat_diarrhea1_site_pharmacy, cat_diarrhea2_site_pharmacy, cat_diarrhea3_site_pharmacy) %>%
+  tab_cells(cat_sex) %>% 
+  tab_stat_rpct(total_statistic = "u_responses",total_row_position = "none", label = "(%)") %>%
+  tab_pivot() %>%
+  htmlTable(caption = "Health seeking at pharmacies by age and severity")
+
+#cross_rpct(mod1_mergedata_rounds_1ab, cat_sex, cat_diarrhea3_site_pharmacy)
+
+chisq_male_v_fem_diarrhea1_seek_at_pharm <- table(healthseek_dia1_mergedata_rounds_1ab$cat_sex,healthseek_dia1_mergedata_rounds_1ab$cat_diarrhea1_site_pharmacy)
+chisq_male_v_fem_diarrhea1_seek_at_pharm
+
+chisq.test(chisq_male_v_fem_diarrhea1_seek_at_pharm)
+
+
+chisq_male_v_fem_diarrhea2_seek_at_pharm <- table(healthseek_dia2_mergedata_rounds_1ab$cat_sex,healthseek_dia2_mergedata_rounds_1ab$cat_diarrhea2_site_pharmacy)
+
+chisq.test(chisq_male_v_fem_diarrhea2_seek_at_pharm)
+
+
+chisq_male_v_fem_diarrhea3_seek_at_pharm <- table(healthseek_dia3_mergedata_rounds_1ab$cat_sex,healthseek_dia3_mergedata_rounds_1ab$cat_diarrhea3_site_pharmacy)
+
+chisq.test(chisq_male_v_fem_diarrhea3_seek_at_pharm)
+
+```
+
+Look at the proportion of people who would seek care for the least severe case at pharmacy among different age groups. (among those who answered yes to ind_diarrhea1_care)
+
+* FINDINGS:
+  + There is no discernible trend between age and willingness to seek care at a pharmacy given the least severe hypothetical symptoms. 
+  + As severity increases people are less likely to seek care at a pharmacy.
+```{r echo = FALSE}
+
+mod1_mergedata_rounds_1ab %>%
+  tab_cols(cat_diarrhea1_site_pharmacy, cat_diarrhea2_site_pharmacy, cat_diarrhea3_site_pharmacy ) %>%
+  tab_cells(under_2, under_3, under_4, under_5, under_10, age_cat, dist_quant) %>% 
+  tab_stat_rpct(total_statistic = "u_responses",total_row_position = "none", label = "(%)") %>%
+  tab_stat_cases(total_statistic = "u_responses",total_row_position = "none", label = "total N") %>%
+  tab_pivot() %>%
+  htmlTable(caption = "Health seeking at pharmacies by age and severity")
+
+```
+
+Why do people say they would seek a pharmacy when they answered yes to ind_diarrhea1_care? How does this compare to people who said they would go to a health facility. (1 = pharm, 0 = health facility) 
+
+* FINDINGS:
+  + people are more likely to mention that they would go to the pharmacy because it is close or more efficient, people are more likely to say that they would go to a health facility because it is more timely when compared to those that chose pharmacies. This is interesting 
+  + When symptoms arent so severe proximity and convenience play a large part in where people would go. 
+```{r echo = F}
+
+cross_cpct_responses(yes_to_ind_diarrhea1_care, cat_diarrhea1_reason, cat_diarrhea1_site_pharmacy)
+
+```
+
+Why do people say they would seek a pharmacy when they answered yes to ind_diarrhea2_care? How does this compare to people who said they would go to a health facility. (1 = pharm, 0 = health facility) 
+
+* FINDINGS:
+  + Closeness is less of a factor for those who say their would go to a health facility when compared to the least severe symptom definition. (30% vs 60%)
+  + Among those who said they would go to a pharmacy "close" is still the overwhelming response (69% vs 67%).
+  + Trust is more of an important factor when compared to the least sevre symptom question but it still accounts for only 10% of reposes among those who would go to a health facility and 8% among those who would go to a pharmacy. 
+```{r echo = F}
+
+cross_cpct_responses(yes_to_ind_diarrhea2_care, cat_diarrhea2_reason, cat_diarrhea2_site_pharmacy)
+
+```
+
+Why do people say they would seek a pharmacy when they answered yes to ind_diarrhea3_care? How does this compare to people who said they would go to a health facility. (1 = pharm, 0 = health facility) 
+
+* FINDINGS:
+  + Trust becomes much more important of a factor for why people would go to a hospital if they are experiencing the most severe symptoms (16% vs 10% vs 2% for most severe to least severe).
+  + People still list "close" as the overwhelming reason for going to a pharmacy. Efficiency is the second most rpominent reason (23%). 
+```{r echo = F}
+
+cross_cpct_responses(yes_to_ind_diarrhea3_care, cat_diarrhea3_reason, cat_diarrhea3_site_pharmacy)
+
+```
+
+```{r echo = F}
+
+cross_cpct_responses(yes_to_ind_diarrhea1_care, cat_diarrhea1_site)
+cross_cpct_responses(yes_to_ind_diarrhea2_care, cat_diarrhea2_site)
+cross_cpct_responses(yes_to_ind_diarrhea3_care, cat_diarrhea3_site)
+
+```
+__________________________________________________________________________________________________
+### Explore different age cut offs
+
+```{r}
+
+mod1_mergedata_rounds_1ab %>%
+  tab_cols(ind_diarrhea1_care, ind_diarrhea2_care, ind_diarrhea3_care, ind_diarrhea_seek_care) %>%
+  tab_cells(under_2, under_3, under_4, under_5, under_6, under_10, age_cat) %>% 
+  tab_stat_rpct(total_statistic = "u_responses",total_row_position = "none", label = "(%)") %>%
+  tab_stat_cases(total_statistic = "u_responses",total_row_position = "none", label = "total N") %>%
+  tab_pivot() %>%
+  htmlTable(caption = "Health seeking age and severity")
+
+
+```
+
+
+__________________________________________________________________________________________________
+### Explore income 
+
+```{r}
+
+#mod_1_mergedata_bar_count <- mod1_mergedata_rounds_1ab %>% group_by(cat_income) %>% count(cat_income, ind_diarrhea1_care) %>% filter(!is.na(ind_diarrhea1_care)) 
+
+mod_1_mergedata_bar <- mod1_mergedata_rounds_1ab %>% group_by(cat_income) %>% count(cat_income, ind_diarrhea1_care) %>% filter(!is.na(ind_diarrhea1_care)) %>% mutate(n = prop.table(n)) %>% mutate(dia_question = "ind_diarrhea1_care") %>% filter(ind_diarrhea1_care %in% "yes") %>% select(-ind_diarrhea1_care)
+
+mod_1_mergedata_bar1 <- mod1_mergedata_rounds_1ab %>% group_by(cat_income) %>% count(cat_income, ind_diarrhea2_care) %>% filter(!is.na(ind_diarrhea2_care)) %>% mutate(n = prop.table(n)) %>% mutate (dia_question = "ind_diarrhea2_care") %>% filter(ind_diarrhea2_care %in% "yes") %>% select(-ind_diarrhea2_care)
+
+mod_1_mergedata_bar2 <- mod1_mergedata_rounds_1ab %>% group_by(cat_income) %>% count(cat_income, ind_diarrhea3_care) %>% filter(!is.na(ind_diarrhea3_care)) %>% mutate(n = prop.table(n)) %>% mutate (dia_question = "ind_diarrhea3_care") %>% filter(ind_diarrhea3_care %in% "yes") %>% select(-ind_diarrhea3_care)
+
+grouped_bar_inc_final <- bind_rows(mod_1_mergedata_bar, mod_1_mergedata_bar1, mod_1_mergedata_bar2)
+
+#grouped_bar_inc <- merge(mod_1_mergedata_bar, mod_1_mergedata_bar1, by="cat_income")
+
+#grouped_bar_inc_final <- merge(grouped_bar_inc, mod_1_mergedata_bar2, by="cat_income")
+
+#income_bar <- grouped_bar_inc_final %>% mutate(income = factor(cat_income, levels=c( "three_k", "five_k", "seven_k", "ten_k", "twenty_k", "over_twenty"))) %>% ggplot(aes(fill= dia_question ,y=n, x=cat_income)) + geom_bar(position="dodge", stat="identity") + xlab("Income Category") + ylab("% yes") + ggtitle("HC Seeking by Income Category") + theme_bw()
+
+#income_bar
+
+ggplot(grouped_bar_inc_final, aes(fill= dia_question ,y=n, x= factor(cat_income, c( "three_k", "five_k", "seven_k", "ten_k", "twenty_k", "over_twenty")))) + geom_bar(position="dodge", stat="identity") + xlab("Income Category") + ylab("% that would seek care") + ggtitle("HC Seeking by Income Category") + theme_bw()
+
+#ggplot(mod_1_mergedata_bar1, aes(fill= ind_diarrhea2_care ,y=n, x=cat_income)) + 
+#    geom_bar(position="dodge", stat="identity")
+
+#ggplot(mod_1_mergedata_bar2, aes(fill= ind_diarrhea3_care ,y=n, x=cat_income)) + 
+#    geom_bar(position="dodge", stat="identity")
+
+#mod_1_mergedata_bar %>%
+#  mutate(income = factor(cat_income, levels=c( "three_k", "five_k", "seven_k", "ten_k", "twenty_k", "over_twenty"))) %>%
+#           ggplot(aes(y=n, x=income)) + 
+#    geom_bar(position="dodge", stat="identity", fill = "lightblue") + xlab("Income Category") + ylab("% yes to ind_diarrhea1_care") + ggtitle("HC Seeking for Mild Symptoms by Income Category") +theme_dark()
+
+#mod_1_mergedata_bar1 %>%
+#  mutate(income = factor(cat_income, levels=c( "three_k", "five_k", "seven_k", "ten_k", "twenty_k", "over_twenty"))) %>%
+#           ggplot(aes(y=n, x=income)) + 
+#    geom_bar(position="dodge", stat="identity", fill = "lightblue") + xlab("Income Category") + ylab("% yes to ind_diarrhea2_care") + ggtitle("HC Seeking for Moderate Symptoms by Income Category") +theme_dark()
+
+#mod_1_mergedata_bar2 %>%
+#  mutate(income = factor(cat_income, levels=c( "three_k", "five_k", "seven_k", "ten_k", "twenty_k", "over_twenty"))) %>%
+#           ggplot(aes(y=n, x=income)) + 
+#    geom_bar(position="dodge", stat="identity", fill = "lightblue") + xlab("Income Category") + ylab("% yes to ind_diarrhea3_care") + ggtitle("HC Seeking for Severe Symptoms by Income Category") +theme_dark()
+
+cross_cases(mod1_mergedata_rounds_1ab, cat_income, ind_diarrhea1_care)
+cross_cases(mod1_mergedata_rounds_1ab, cat_income, ind_diarrhea2_care)
+cross_cases(mod1_mergedata_rounds_1ab, cat_income, ind_diarrhea3_care)
+
+```
+
+# IND_DIARRHEA1_CARE LOGISTIC REGRESSION
+__________________________________________________________________________________________________
+
+
+## Univariate Models:
+
+### Sex 
+
+* FINDINGS:
+  + Not statistically significant 
+  
+```{r}
+
+any(is.na(mod1_mergedata_rounds_1ab$cat_sex))
+
+unimodel_ind_diarrhea1_care_sex = glm(mod_ind_diarrhea1_care ~ cat_sex, data=mod1_mergedata_rounds_1ab,
+             family=binomial(link="logit"))
+
+summary(unimodel_ind_diarrhea1_care_sex)
+exp(unimodel_ind_diarrhea1_care_sex$coefficients)
+
+```
+
+### Distance from Chittagong port (categorical variable)
+
+* FINDINGS:
+  + Statistically significant 
+  + It looks like people who are less urban and then more rural are less likely to seek care when compared to people that are most urban but those that are most rural are more likely to seek care than those that are most urban... why? 
+  
+```{r}
+
+any(is.na(mod1_mergedata_rounds_1ab$dist_quant))
+
+unimodel_ind_diarrhea1_care_dist_quant = glm(mod_ind_diarrhea1_care ~ dist_quant, data=(mod1_mergedata_rounds_1ab %>% filter(!is.na(dist_quant))),
+             family=binomial(link="logit"))
+
+summary(unimodel_ind_diarrhea1_care_dist_quant)
+exp(unimodel_ind_diarrhea1_care_dist_quant$coefficients)
+
+```
+
+### Distance from Chittagong port (cont variable) 
+
+* FINDINGS:
+  + Statistically significant 
+  
+```{r}
+
+any(is.na(mod1_mergedata_rounds_1ab$dist_port))
+
+unimodel_ind_diarrhea1_care_dist_port = glm(mod_ind_diarrhea1_care ~ dist_port, data=(mod1_mergedata_rounds_1ab %>% filter(!is.na(dist_port))),
+             family=binomial(link="logit"))
+
+summary(unimodel_ind_diarrhea1_care_dist_port)
+exp(unimodel_ind_diarrhea1_care_dist_port$coefficients)
+
+```
+
+### Age (under 5, binary variable)
+
+* FINDINGS:
+  + Statistically significant 
+  + People under 5 years of age are more likely to not seek care than those that are not. (Log(OR) = .67)
+  
+```{r}
+
+any(is.na(mod1_mergedata_rounds_1ab$under_5))
+
+unimodel_ind_diarrhea1_care_under_5 = glm(mod_ind_diarrhea1_care ~ under_5, data=(mod1_mergedata_rounds_1ab %>% filter(!is.na(under_5))),
+             family=binomial(link="logit"))
+
+summary(unimodel_ind_diarrhea1_care_under_5)
+exp(unimodel_ind_diarrhea1_care_under_5$coefficients)
+
+```
+
+### Age (cont variable) 
+
+* FINDINGS:
+  + Not statistically significant 
+  
+```{r}
+
+any(is.na(mod1_mergedata_rounds_1ab$n_age))
+
+unimodel_ind_diarrhea1_care_n_age_sansNA = glm(mod_ind_diarrhea1_care ~ n_age, data=(mod1_mergedata_rounds_1ab),
+             family=binomial(link="logit"))
+
+unimodel_ind_diarrhea1_care_n_age = glm(mod_ind_diarrhea1_care ~ n_age, data=(mod1_mergedata_rounds_1ab %>% filter(!is.na(n_age))),
+             family=binomial(link="logit"))
+
+summary(unimodel_ind_diarrhea1_care_n_age)
+
+exp(unimodel_ind_diarrhea1_care_n_age$coefficients)
+
+```
+
+### Education (binary variable) (indedu_school) (among those 18 years and older)
+
+* FINDINGS:
+  + Not statistically significant 
+  
+```{r}
+
+any(is.na(mod1_mergedata_rounds_1ab$ind_edu_school))
+
+unimodel_ind_diarrhea1_care_ind_edu_school = glm(mod_ind_diarrhea1_care ~ ind_edu_school, data= (mod1_mergedata_rounds_1ab_sans_indedu_decline %>% filter(under_18 %in% "no")), family=binomial(link="logit")) 
+
+summary(unimodel_ind_diarrhea1_care_ind_edu_school)
+
+exp(unimodel_ind_diarrhea1_care_ind_edu_school$coefficients)
+
+```
+
+### Have any access to personal transportation
+
+* FINDINGS:
+  + Statistically significant 
+  + People without a mode of transportation have a OR of .69 of seeking care when compared to those who have a mode of transport
+ 
+```{r}
+unimodel_ind_diarrhea1_care_ind_transport = glm(mod_ind_diarrhea1_care ~ ind_have_any_trans, data=(mod1_mergedata_rounds_1ab %>% filter(!is.na(ind_have_any_trans))), family=binomial(link="logit")) 
+
+summary(unimodel_ind_diarrhea1_care_ind_transport)
+exp(unimodel_ind_diarrhea1_care_ind_transport$coefficients)
+
+#str(mod1_mergedata_rounds_1ab)
+
+```
+
+### Internet access 
+
+* FINDINGS:
+  + Statistically significant 
+  + Those with internet have a log odds of saying that they would seek care of -1.14 when compared to those without access to internet 
+  
+```{r}
+
+#any(is.na(mod1_mergedata_rounds_1ab$ind_internet))
+
+unimodel_ind_diarrhea1_care_ind_internet = glm(mod_ind_diarrhea1_care ~ ind_internet, data=(mod1_mergedata_rounds_1ab),
+             family=binomial(link="logit"))
+
+summary(unimodel_ind_diarrhea1_care_ind_internet)
+exp(unimodel_ind_diarrhea1_care_ind_internet$coefficients)
+
+```
+
+### Income (Income_over_7K, Income_over_10K, Income_over_20K)
+
+```{r}
+unimodel_ind_diarrhea1_care_income7 = glm(mod_ind_diarrhea1_care ~ Income_over_7K, data=mod1_mergedata_rounds_1ab,
+             family=binomial(link="logit"))
+
+unimodel_ind_diarrhea1_care_income10 = glm(mod_ind_diarrhea1_care ~ Income_over_10K, data=mod1_mergedata_rounds_1ab,
+             family=binomial(link="logit"))
+
+unimodel_ind_diarrhea1_care_income20 = glm(mod_ind_diarrhea1_care ~ Income_over_20K, data=mod1_mergedata_rounds_1ab,
+             family=binomial(link="logit"))
+
+summary(unimodel_ind_diarrhea1_care_income7)
+exp(unimodel_ind_diarrhea1_care_income7$coefficients)
+summary(unimodel_ind_diarrhea1_care_income10)
+exp(unimodel_ind_diarrhea1_care_income10$coefficients)
+summary(unimodel_ind_diarrhea1_care_income20)
+exp(unimodel_ind_diarrhea1_care_income20$coefficients)
+
+mod1_mergedata_rounds_1ab %>% mutate(cat_income = fct_relevel(cat_income, "three_k", "five_k", "seven_k", "ten_k", "twenty_k", "over_twenty")) %>% 
+  ggplot(aes(x = cat_income, fill = ind_diarrhea1_care)) +
+  geom_bar() ### suggests that we use the 10K cut off 
+
+```
+
+### Electricity
+
+```{r}
+unimodel_ind_diarrhea1_elec = glm(mod_ind_diarrhea1_care ~ ind_electricity, data=mod1_mergedata_rounds_1ab,
+             family=binomial(link="logit"))
+
+
+summary(unimodel_ind_diarrhea1_elec)
+exp(unimodel_ind_diarrhea1_elec$coefficients)
+
+
+```
+
+### Walls
+
+How should i select a ref point? 
+
+```{r}
+
+#any(is.na(mod1_mergedata_rounds_1ab$ind_internet))
+
+mod1_mergedata_rounds_1ab <- mod1_mergedata_rounds_1ab %>% 
+  mutate(cat_walls = as.factor(cat_walls)) %>%
+  mutate(cat_walls = relevel(cat_walls, ref = "mud")) 
+  
+unimodel_ind_diarrhea1_care_ind_walls = glm(mod_ind_diarrhea1_care ~ cat_walls, data=(mod1_mergedata_rounds_1ab),
+             family=binomial(link="logit"))
+
+summary(unimodel_ind_diarrhea1_care_ind_walls)
+exp(unimodel_ind_diarrhea1_care_ind_walls$coefficients)
+
+
+mod1_mergedata_rounds_1ab %>% 
+  ggplot(aes(x = cat_walls, fill = ind_diarrhea1_care)) +
+  geom_bar()
+
+```
+
+### Floors
+
+```{r}
+
+#any(is.na(mod1_mergedata_rounds_1ab$ind_internet))
+
+unimodel_ind_diarrhea1_care_ind_floors = glm(mod_ind_diarrhea1_care ~ cat_floors, data=(mod1_mergedata_rounds_1ab),
+             family=binomial(link="logit"))
+
+summary(unimodel_ind_diarrhea1_care_ind_floors)
+exp(unimodel_ind_diarrhea1_care_ind_floors$coefficients)
+
+```
+
+
+## Multi-variate 
+
+### ind_have_any_trans + n_age + cat_sex 
+
+* FINDINGS:
+  + Statistically significant 
+  + People without a mode of transportation have an OR of seeking care of 0.69 compared to those who have a mode of transport
+ 
+```{r}
+multimodel_ind_diarrhea1_care_ind_transport = glm(mod_ind_diarrhea1_care ~ ind_have_any_trans + n_age + cat_sex, data=mod1_mergedata_rounds_1ab , family=binomial(link="logit")) 
+
+multimodel_ind_diarrhea1_care_ind_transport = glm(mod_ind_diarrhea1_care ~ ind_have_any_trans + n_age + cat_sex, data=(mod1_mergedata_rounds_1ab %>% filter(!is.na(ind_have_any_trans))), family=binomial(link="logit"))
+summary(multimodel_ind_diarrhea1_care_ind_transport)
+exp(multimodel_ind_diarrhea1_care_ind_transport$coefficients)
+
+```
+
+### Age(under_5)-sex interaction
+
+* FINDINGS:
+  + No interaction is found
+
+```{r}
+
+multimodel_ind_diarrhea1_care_age_sex_int = glm(mod_ind_diarrhea1_care ~ under_5 + cat_sex + under_5 * cat_sex, data=(mod1_mergedata_rounds_1ab),
+             family=binomial(link="logit"))
+
+multimodel_ind_diarrhea1_care_age_sex = glm(mod_ind_diarrhea1_care ~ under_5 + cat_sex, data=(mod1_mergedata_rounds_1ab),
+            family=binomial(link="logit"))
+
+summary(multimodel_ind_diarrhea1_care_age_sex_int)
+summary(unimodel_ind_diarrhea1_care_sex)
+summary(unimodel_ind_diarrhea1_care_n_age)
+
+lrtest(unimodel_ind_diarrhea1_care_under_5, multimodel_ind_diarrhea1_care_age_sex, multimodel_ind_diarrhea1_care_age_sex_int)
+```
+
+### under_5 + Income_over_7K + ind_have_any_trans + dist_quant + cat_floors
+
+```{r}
+
+multimodel_ind_diarrhea1_care_age_trans_edu_dist_income_floor = glm(mod_ind_diarrhea1_care ~ under_5 + Income_over_7K + ind_have_any_trans + dist_quant + cat_floors, data=(mod1_mergedata_rounds_1ab),
+             family=binomial(link="logit"))
+
+summary(multimodel_ind_diarrhea1_care_age_trans_edu_dist_income_floor)
+#str(mod1_mergedata_rounds_1ab)
+```
+
+
+## Final Anlaysis Models:
+
+### transport, age, sex, internet, electricity, HH inc, HH setting  
+
+* FINDINGS:
+  + 
+ 
+```{r}
+multimodel_ind_diarrhea1_final_model0 = glm(mod_ind_diarrhea1_care ~ ind_have_any_trans + under_5 + Income_over_10K + ind_internet + ind_electricity + port_dist_binary, data=mod1_mergedata_rounds_1ab , family=binomial(link="logit")) 
+
+multimodel_ind_diarrhea1_final_model1 = glm(mod_ind_diarrhea1_care ~ ind_have_any_trans + under_5 + Income_over_7K + ind_internet + ind_electricity + port_dist_binary, data=mod1_mergedata_rounds_1ab , family=binomial(link="logit")) 
+
+multimodel_ind_diarrhea1_final_model2 = glm(mod_ind_diarrhea1_care ~ ind_have_any_trans + under_5 + Income_over_10K + ind_internet + ind_electricity + dist_port, data=mod1_mergedata_rounds_1ab , family=binomial(link="logit")) 
+
+multimodel_ind_diarrhea1_final_model3 = glm(mod_ind_diarrhea1_care ~ ind_have_any_trans + under_5 + Income_over_10K + ind_internet + ind_electricity + dist_quant, data=mod1_mergedata_rounds_1ab , family=binomial(link="logit")) 
+
+multimodel_ind_diarrhea1_final_model4 = glm(mod_ind_diarrhea1_care ~ ind_have_any_trans + under_5 + cat_income + ind_internet + ind_electricity + port_dist_binary, data=mod1_mergedata_rounds_1ab , family=binomial(link="logit"))
+
+AIC(multimodel_ind_diarrhea1_final_model0, multimodel_ind_diarrhea1_final_model1, multimodel_ind_diarrhea1_final_model2, multimodel_ind_diarrhea1_final_model3, multimodel_ind_diarrhea1_final_model4)
+
+```
+
+### Final Multivariate Model
+
+ 
+```{r}
+
+multimodel_ind_diarrhea1_final_model = glm(mod_ind_diarrhea1_care ~ ind_have_any_trans + under_5 + cat_income + ind_internet + ind_electricity + port_dist_binary, data=mod1_mergedata_rounds_1ab , family=binomial(link="logit"))
+
+summary(multimodel_ind_diarrhea1_final_model)
+exp(multimodel_ind_diarrhea1_final_model$coefficients)
+
+```
+
+
+
+# IND_DIARRHEA2_CARE LOGISTIC REGRESSION
+__________________________________________________________________________________________________
+
+## Univariate Models
+
+### Sex
+
+```{r}
+unimodel_ind_diarrhea2_care_sex = glm(mod_ind_diarrhea2_care ~ cat_sex, data=mod1_mergedata_rounds_1ab,
+             family=binomial(link="logit"))
+
+summary(unimodel_ind_diarrhea2_care_sex)
+exp(unimodel_ind_diarrhea2_care_sex$coefficients)
+```
+
+### Age (under 5, binary variable)
+
+```{r}
+unimodel_ind_diarrhea2_care_under5 = glm(mod_ind_diarrhea2_care ~ under_5, data=mod1_mergedata_rounds_1ab,
+             family=binomial(link="logit"))
+
+summary(unimodel_ind_diarrhea2_care_under5)
+exp(unimodel_ind_diarrhea2_care_under5$coefficients)
+```
+
+### Have any access to personal transportation
+
+```{r}
+unimodel_ind_diarrhea2_care_trans = glm(mod_ind_diarrhea2_care ~ ind_have_any_trans, data=mod1_mergedata_rounds_1ab,
+             family=binomial(link="logit"))
+
+summary(unimodel_ind_diarrhea2_care_trans)
+exp(unimodel_ind_diarrhea2_care_trans$coefficients)
+```
+
+### Education (ind_edu_school)
+
+```{r}
+unimodel_ind_diarrhea2_care_edu = glm(mod_ind_diarrhea2_care ~ ind_edu_school, data=(mod1_mergedata_rounds_1ab_sans_indedu_decline %>% filter(under_18 %in% "no")), family=binomial(link="logit"))
+
+summary(unimodel_ind_diarrhea2_care_edu)
+exp(unimodel_ind_diarrhea2_care_edu$coefficients)
+```
+
+### Distance from Chittagong port (categorical variable)
+
+```{r}
+unimodel_ind_diarrhea2_care_dist = glm(mod_ind_diarrhea2_care ~ dist_quant, data=mod1_mergedata_rounds_1ab_sans_indedu_decline, family=binomial(link="logit"))
+
+summary(unimodel_ind_diarrhea2_care_dist)
+exp(unimodel_ind_diarrhea2_care_dist$coefficients)
+```
+
+### Income (Income_over_7K, Income_over_10K, Income_over_20K)
+
+```{r}
+unimodel_ind_diarrhea2_care_income7 = glm(mod_ind_diarrhea2_care ~ Income_over_7K, data=mod1_mergedata_rounds_1ab,
+             family=binomial(link="logit"))
+
+unimodel_ind_diarrhea2_care_income10 = glm(mod_ind_diarrhea2_care ~ Income_over_10K, data=mod1_mergedata_rounds_1ab,
+             family=binomial(link="logit"))
+
+unimodel_ind_diarrhea2_care_income20 = glm(mod_ind_diarrhea2_care ~ Income_over_20K, data=mod1_mergedata_rounds_1ab,
+             family=binomial(link="logit"))
+
+summary(unimodel_ind_diarrhea2_care_income7)
+exp(unimodel_ind_diarrhea2_care_income7$coefficients)
+summary(unimodel_ind_diarrhea2_care_income10)
+exp(unimodel_ind_diarrhea2_care_income10$coefficients)
+summary(unimodel_ind_diarrhea2_care_income20)
+
+```
+
+### Electricity
+
+```{r}
+unimodel_ind_diarrhea2_care_electricity = glm(mod_ind_diarrhea2_care ~ ind_electricity, data=mod1_mergedata_rounds_1ab,
+             family=binomial(link="logit"))
+
+summary(unimodel_ind_diarrhea2_care_electricity)
+exp(unimodel_ind_diarrhea2_care_electricity$coefficients)
+```
+
+### Internet
+
+```{r}
+unimodel_ind_diarrhea2_care_internet = glm(mod_ind_diarrhea2_care ~ ind_internet, data=mod1_mergedata_rounds_1ab,
+             family=binomial(link="logit"))
+
+summary(unimodel_ind_diarrhea2_care_internet)
+exp(unimodel_ind_diarrhea2_care_internet$coefficients)
+```
+
+### Age (cont)
+
+```{r}
+unimodel_ind_diarrhea2_care_age_cont = glm(mod_ind_diarrhea2_care ~ n_age, data=mod1_mergedata_rounds_1ab,
+             family=binomial(link="logit"))
+
+summary(unimodel_ind_diarrhea2_care_age_cont)
+exp(unimodel_ind_diarrhea2_care_age_cont$coefficients)
+```
+
+
+
+# IND_DIARRHEA3_CARE LOGISTIC REGRESSION
+__________________________________________________________________________________________________
+
+## Univariate Models
+
+### Sex
+
+```{r}
+unimodel_ind_diarrhea3_care_sex = glm(mod_ind_diarrhea3_care ~ cat_sex, data=mod1_mergedata_rounds_1ab,
+             family=binomial(link="logit"))
+
+summary(unimodel_ind_diarrhea3_care_sex)
+exp(unimodel_ind_diarrhea3_care_sex$coefficients)
+```
+
+### Age (under 5, binary variable)
+
+```{r}
+unimodel_ind_diarrhea3_care_under5 = glm(mod_ind_diarrhea3_care ~ under_5, data=mod1_mergedata_rounds_1ab,
+             family=binomial(link="logit"))
+
+summary(unimodel_ind_diarrhea3_care_under5)
+exp(unimodel_ind_diarrhea3_care_under5$coefficients)
+```
+
+### Have any access to personal transportation
+
+```{r}
+unimodel_ind_diarrhea3_care_trans = glm(mod_ind_diarrhea3_care ~ ind_have_any_trans, data=mod1_mergedata_rounds_1ab,
+             family=binomial(link="logit"))
+
+summary(unimodel_ind_diarrhea3_care_trans)
+exp(unimodel_ind_diarrhea3_care_trans$coefficients)
+```
+
+### Education (ind_edu_school)
+
+```{r}
+unimodel_ind_diarrhea3_care_edu = glm(mod_ind_diarrhea3_care ~ ind_edu_school, data=(mod1_mergedata_rounds_1ab_sans_indedu_decline %>% filter(under_18 %in% "no")), family=binomial(link="logit"))
+
+summary(unimodel_ind_diarrhea3_care_edu)
+exp(unimodel_ind_diarrhea3_care_edu$coefficients)
+
+```
+
+### Distance from Chittagong port (categorical variable)
+
+```{r}
+unimodel_ind_diarrhea3_care_dist = glm(mod_ind_diarrhea3_care ~ dist_quant, data=mod1_mergedata_rounds_1ab_sans_indedu_decline, family=binomial(link="logit"))
+
+summary(unimodel_ind_diarrhea3_care_dist)
+exp(unimodel_ind_diarrhea3_care_dist$coefficients)
+
+mod1_mergedata_rounds_1ab %>% 
+  ggplot(aes(x = dist_quant, fill = ind_diarrhea3_care)) +
+  geom_bar() 
+```
+
+### Income (Income_over_7K, Income_over_10K, Income_over_20K)
+
+```{r}
+unimodel_ind_diarrhea3_care_income7 = glm(mod_ind_diarrhea3_care ~ Income_over_7K, data=mod1_mergedata_rounds_1ab,
+             family=binomial(link="logit"))
+
+unimodel_ind_diarrhea3_care_income10 = glm(mod_ind_diarrhea3_care ~ Income_over_10K, data=mod1_mergedata_rounds_1ab,
+             family=binomial(link="logit"))
+
+unimodel_ind_diarrhea3_care_income20 = glm(mod_ind_diarrhea3_care ~ Income_over_20K, data=mod1_mergedata_rounds_1ab,
+             family=binomial(link="logit"))
+
+summary(unimodel_ind_diarrhea3_care_income7)
+summary(unimodel_ind_diarrhea3_care_income10)
+exp(unimodel_ind_diarrhea3_care_income10$coefficients)
+summary(unimodel_ind_diarrhea3_care_income20)
+
+```
+
+### Age(cont)
+
+```{r}
+unimodel_ind_diarrhea3_care_age_cont = glm(mod_ind_diarrhea3_care ~ n_age, data=mod1_mergedata_rounds_1ab,
+             family=binomial(link="logit"))
+
+summary(unimodel_ind_diarrhea3_care_age_cont)
+exp(unimodel_ind_diarrhea3_care_age_cont$coefficients)
+```
+
+
+
+
+# EXTRA TABLES
+
+__________________________________________________________________________________________________
+
+### Table 1
+
+````{r}
+table1_data <- mod1_mergedata_rounds_1ab %>% filter(!ind_diarrhea_month %in% "na") 
+
+table1_data %>%
+  tab_cols(ind_diarrhea_month, ind_diarrhea_seek_care, ind_diarrhea1_care, ind_diarrhea2_care, ind_diarrhea3_care) %>%
+  tab_cells() %>%
+  tab_stat_cases(label = "count") %>%
+  tab_cells(n_age) %>% 
+  tab_stat_mean(label = "Years") %>%
+  tab_stat_sd(label = "Years") %>%
+  tab_cells(age_cat, cat_sex, dist_quant, ind_electricity, ind_have_any_trans) %>%
+  tab_stat_rpct(total_row_position = "none", label = "%") %>%
+  tab_pivot(stat_position = "inside_rows") %>%
+  htmlTable(caption = "Table 1: Exploring Healthcare Seeking Behavior in Roundds 1A and 1B")
+
+
+#str(mod1_mergedata_rounds_1ab)
+          
+
+```
+
+__________________________________________________________________________________________________
+### Other Tables
+
+
+```{r}
+
+#cross_cases(mod1_mergedata_rounds_1ab, cat_diarrhea1_site)
+#cross_cases(mod1_mergedata_rounds_1ab, cat_diarrhea2_site)
+#cross_cases(mod1_mergedata_rounds_1ab, cat_diarrhea3_site)
+
+mod1_mergedata_rounds_1ab %>%
+  tab_cols(diarrhea1_seek_facility, diarrhea2_seek_facility, diarrhea3_seek_facility) %>%
+  tab_cells(n_age) %>% 
+  tab_stat_mean() %>%
+  tab_stat_sd() %>%
+  tab_stat_valid_n() %>%
+  tab_cells(under_5, cat_sex, dist_quant, ind_electricity, ind_have_any_trans) %>%
+  tab_stat_rpct(total_row_position = "none", label = "row %") %>%
+  tab_pivot(stat_position = "inside_rows") %>%
+  htmlTable(caption = "Table 2 - Healthcare Seeking Facilities by Severity of Hypothetical Symptoms")
+
+```
+
+
+
+
+# EXTRA PLOTS
+
+Alluvial plots for those who sought care based on ind_diarrhea1,2,3_care questions based on sex and under 5 status
+```{r echo = FALSE}
+
+alluvial_ind_dia1_care_sex_under5 <- ggplot(as.data.frame(alluvial_data_ind_diarrhea1_care),
+       aes(y = obs, axis1 = cat_sex, axis2 = under_5)) +
+  geom_alluvium(aes(fill = ind_diarrhea1_care), width = 1/12) +
+  geom_stratum(width = 1/10, fill = "black", color = "grey") +
+  geom_label(stat = "stratum", aes(label = after_stat(stratum))) +
+  scale_x_discrete(limits = c("Sex", "dist_quant"), expand = c(.05, .05)) +
+  scale_fill_brewer(type = "qual", palette = "Set1") +
+  ggtitle("ind_diarhea1_care")
+
+alluvial_ind_dia2_care_sex_under5 <- ggplot(as.data.frame(alluvial_data_ind_diarrhea2_care),
+       aes(y = obs, axis1 = cat_sex, axis2 = under_5)) +
+  geom_alluvium(aes(fill = ind_diarrhea2_care), width = 1/12) +
+  geom_stratum(width = 1/10, fill = "black", color = "grey") +
+  geom_label(stat = "stratum", aes(label = after_stat(stratum))) +
+  scale_x_discrete(limits = c("Sex", "dist_quant"), expand = c(.05, .05)) +
+  scale_fill_brewer(type = "qual", palette = "Set1") +
+  ggtitle("ind_diarhea2_care")
+
+alluvial_ind_dia3_care_sex_under5 <- ggplot(as.data.frame(alluvial_data_ind_diarrhea3_care),
+       aes(y = obs, axis1 = cat_sex, axis2 = under_5)) +
+  geom_alluvium(aes(fill = ind_diarrhea3_care), width = 1/12) +
+  geom_stratum(width = 1/10, fill = "black", color = "grey") +
+  geom_label(stat = "stratum", aes(label = after_stat(stratum))) +
+  scale_x_discrete(limits = c("Sex", "dist_quant"), expand = c(.05, .05)) +
+  scale_fill_brewer(type = "qual", palette = "Set1") +
+  ggtitle("ind_diarhea3_care")
+
+alluvial_ind_dia1_care_sex_under5
+alluvial_ind_dia2_care_sex_under5
+alluvial_ind_dia3_care_sex_under5
+
+```
+
+
+
+```{r echo = FALSE}
+
+alluvial_data_yes_to_ind_diarrhea1_care <- yes_to_ind_diarrhea1_care %>% filter(!is.na(cat_sex), !is.na(age_cat), !is.na(dist_quant), !is.na(ind_diarrhea1_care),!is.na(under_5),!is.na(diarrhea1_seek_at_our_hosps),!is.na(diarrhea_care_cat)) %>%
+  group_by(diarrhea1_seek_at_our_hosps, cat_sex, age_cat, under_5, dist_quant) %>%
+  summarize(obs = n())
+
+alluvial_data_yes_to_ind_diarrhea2_care <- yes_to_ind_diarrhea2_care %>% filter(!is.na(cat_sex), !is.na(age_cat), !is.na(dist_quant), !is.na(ind_diarrhea2_care),!is.na(under_5),!is.na(diarrhea2_seek_at_our_hosps),!is.na(diarrhea_care_cat)) %>%
+  group_by(diarrhea2_seek_at_our_hosps, cat_sex, age_cat, under_5, dist_quant) %>%
+  summarize(obs = n())
+
+alluvial_data_yes_to_ind_diarrhea3_care <- yes_to_ind_diarrhea3_care %>% filter(!is.na(cat_sex), !is.na(age_cat), !is.na(dist_quant), !is.na(ind_diarrhea3_care),!is.na(under_5),!is.na(diarrhea3_seek_at_our_hosps),!is.na(diarrhea_care_cat)) %>%
+  group_by(diarrhea3_seek_at_our_hosps, cat_sex, age_cat, under_5, dist_quant) %>%
+  summarize(obs = n())
+
+alluvial_our_hosp_1 <- ggplot(as.data.frame(alluvial_data_yes_to_ind_diarrhea1_care),
+       aes(y = obs, axis1 = cat_sex, axis2 = under_5)) +
+  geom_alluvium(aes(fill = diarrhea1_seek_at_our_hosps), width = 1/12) +
+  geom_stratum(width = 1/10, fill = "black", color = "grey") +
+  geom_label(stat = "stratum", aes(label = after_stat(stratum))) +
+  scale_x_discrete(limits = c("Sex", "dist_quant"), expand = c(.05, .05)) +
+  scale_fill_brewer(type = "qual", palette = "Set1") +
+  ggtitle("ind_diarhea1_care")
+
+alluvial_our_hosp_1
+
+alluvial_our_hosp_2 <- ggplot(as.data.frame(alluvial_data_yes_to_ind_diarrhea2_care),
+       aes(y = obs, axis1 = cat_sex, axis2 = under_5)) +
+  geom_alluvium(aes(fill = diarrhea2_seek_at_our_hosps), width = 1/12) +
+  geom_stratum(width = 1/10, fill = "black", color = "grey") +
+  geom_label(stat = "stratum", aes(label = after_stat(stratum))) +
+  scale_x_discrete(limits = c("Sex", "dist_quant"), expand = c(.05, .05)) +
+  scale_fill_brewer(type = "qual", palette = "Set1") +
+  ggtitle("ind_diarhea2_care")
+
+alluvial_our_hosp_2
+
+alluvial_our_hosp_3 <- ggplot(as.data.frame(alluvial_data_yes_to_ind_diarrhea3_care),
+       aes(y = obs, axis1 = cat_sex, axis2 = under_5)) +
+  geom_alluvium(aes(fill = diarrhea3_seek_at_our_hosps), width = 1/12) +
+  geom_stratum(width = 1/10, fill = "black", color = "grey") +
+  geom_label(stat = "stratum", aes(label = after_stat(stratum))) +
+  scale_x_discrete(limits = c("Sex", "dist_quant"), expand = c(.05, .05)) +
+  scale_fill_brewer(type = "qual", palette = "Set1") +
+  ggtitle("ind_diarhea3_care")
+
+alluvial_our_hosp_3
+
+```
+
+
+
+# FINDINGS 
+
+__________________________________________________________________________________________________
+
+### Key Findings
+
+* (2.0.1) Explore outcome dynamics for those who had diarrhea in the last month.
+  + 78 people experienced diarrhea in the last month in rounds 1a and 1b, among them 37 people sought care and 41 did not. As severity of hypothetical symptoms increases people who said they wouldn't seek care and actually had diarrhea in the last month were more likely to not seek care. 
+  + Only 3.3% of respondents in rounds 1 a and b reported experiencing diarrhea like symptoms in the previous month. 
+  + It seems that older people, females, those that live in more rural environments, and those with higher incomes / any education were more likely to have diarrhea. The increased propensity in those with higher incomes and in those with any education could be a symptom of reporting bias...
+  
+* (2.0.2) Explore outcome dynamics for those who had diarrhea in the last month and sought care?
+  + Among those who responded to having diarrhea like symptoms in the last month, those that sought care had an average age of 37.4 years compared an average age of 30.2 years in those who did not seek care. 
+  + People who have any educated or have access to personal transport seem less likely to have sought care. 
+  + Among those who responded to having diarrhea like symptoms in the last month, 53% of females responded that they sought care, comparatively only 39% of males sought care. 
+
+* (2.03) Explore counts of categorical variables in rounds 1a and 1b.
+  + 1759 people said yes to ind_diarrhea1_care, 1994 people said yes to ind_diarrhea2_care, 2190 people said yes to ind_diarrhea3_care in rounds 1a and 1b. 
+
+* (2.0.4) Look at what proportion of people that said they would seek care said yes to all 3 questions.
+  + 75% of people who said yes to ind_diarrhea1_care said yes to the other 2 questions. 
+  + Females were more likely to hypothetically seek care as they responded yes in higher proportions for all three categories
+
+* (2.0.5) Look at distance from the port as a variable to indicate ubanicity of the household.
+  + As the severity of possible symptoms increases there is a roughly uniform increase in healthcare seeking behavior among the different sexes and among those that live in different levels of urban or peri-urban areas - see alluvial plots. 
+
+* (2.0.6) Compare Characteristics of Respondents Based on Answers to ind_diarrhea1_care vs ind_diarrhea2_care vs ind_diarrhea3_care.
+  + see table - differences in row percentages within under 5, any education, and personal transport seems to become smaller as severity increases.  
+  
+* (2.0.7) Explore the characteristics of those who answered yes or no to ind_diarrhea1_care
+  + About 20 percent of people who said they would seek care (ind_diarrhea1_care) would do so at either BITID or SUHC.
+  + There doesn’t seem to be a diff in age between those who would or wouldn’t seek care at our hosps but people under 5 years of age were more likely to seek care at either BITID or SUHC when compared to people over 5.
+  + It seems that those who said that they would seek care at our hospital lived closer to the port than those that said that they wouldn’t. However, as symptom severity increases, distance to port is similar between those who said they would seek care at one of our hospitals and those who said that they wouldn’t.
+  + People under 5 years of age were more likely to seek care for the least severe case when compared to people over 5.
+  + People in the most rural quantile were more likely to indicate that they would seek care (89%) when compared to the other quarantines (77%, 71%, 65% for most urban, less urban, and more rural respectively).
+
+* (2.0.8) Explore the characteristics of those who answered yes to ind_diarrhea2_care
+  + About 30 percent of people who said they would seek care (ind_diarrhea2_care) would do so at either BITID or SUHC.
+  + As severity increases from ind_diarrhea1_care to ind_diarrhea2_care people are more likely to to go to the either BITID or SUHC and the previously noted difference between those under and over 5 has become negligible.
+  + Both under 5s and over 5s are about 10% more likely to seek care for the mid range of severity when compared to the more mild case definition.
+  + People in the most rural quantile were more likely to indicate that they would seek care (95%) when compared to the other quarantines (87%, 82%, 79% for most urban, less urban, and more rural respectively). These percenatges have increased by roughtly +10% when compared to the responses to ind_doarrhea1_care. 
+
+* (2.0.9) Explore the characteristics of those who answered yes to ind_diarrhea3_care
+  + About 46 percent of people who said they would seek care (ind_diarrhea3_care) would do so at either BITID or SUHC. 43% would seek care at a hospital in general. 
+  + The difference between under 5 and over 5 care seeking behavior is less for the most severe cases but it is still there (diff is about 4%). People are more likely to seek care though for a more severe case.
+
+* (2.0.10) Look at how sex affects someones response to the seek care (ind_diarrhea1,2,3_care) questions
+  + It looks like sex doesn't affect the positive or negative response proportions to the three questions. 
+
+* (2.0.12) Explore care seeking at pharmacies
+  + It appears that those who are under 5 are more likely to seek care at a pharmacy when compared to those that are over 5 if the case is more or most severe. 
+  + As the case definition becomes more severe it seems that males are more likely to choose to go to a pharmacy than females.
+  + There is no discernible trend between age and willingness to seek care at a pharmacy given the least severe hypothetical symptoms.
+  + As severity increases people are less likely to seek care at a pharmacy.
+  + As severity of hypothetical disease increases people are more likely to go to a hospital. Trust and efficiency becomes a more important factor possibly causing people to go to a hospital and could be the driving factor for why people 
+
+
+### Additional Findings
+
+* Those that are over 5 years old are less likely to go to a pharmacy for treatment if the case is the most severe. Under 5s are more likely to go to BITID than those over 5 but have the same prob of going to SUHC.(2.0.12)
+
+* It looks like males are slightly more likely to go to a pharmacy than women when the case is more severe (cat_diarrhea2_site) (p value of 0.065). There is no diff in prop of those who seek care at one of our two hosps.(2.0.12)
+
+*It looks like males are more likely to go to a pharmacy than women when the case is most severe (p value of males vs females = 0.07). Males may be slightly less likely to visit on of our 2 hospitals given the most severe case definition.(2.0.12)
+
+*People under 5 years of age are more likely to seek care at a pharmacy when compared to people over 5 (64% vs 58%)
+
+*As the case definition gets more severe less people in general are seeking care at a pharmacy and the difference between those that are over 5 and under 5 years of age is less pronounced but still there (45% vs 40% (dia3_care); 60% vs 50% (dia2_care); 64% vs 58% (dia1_care))
+
+* Sex doesn't appear to influence where people would seek care if the case is less severe. If the case is more or most severe then males are more likely to go to the pharmacy and may be slightly less likely to go to go to either BITID or SUHC when compared to females. This difference is care seeking at our two hospitals isnt statistically significant between the sexes.(2.0.12)
+
+* Those that would seek care for a less severe case (ind_diarrhea1_care) are less likely to go to one of our hospitals than those that have more severe cases (ind_diarrhea2,3_case)
+
+* It looks like a higher proportion of people said yes to the more severe question (ind_diarrhea3_case) than to the other two. There appears to be a higher proportion of positive responses to questions 1 and 2 among the under 5 population than the rest of the age categories.
+
+* As severity increases (ind_diarrhea1_care least vs ind_diarrhea3_care most) males are increasingly more likely to seek care at a pharmacy when compared to women. 
+
+* Females had diarrhea in the last month at a higher proportion than their overall proportion in the survey population. 
+
+* For ind_diarrhea1_care there doesnt seem to be a diff in mean age between those who would or wouldnt seek care at our hosps. It seems that those who said that they would seek care at our hospital lived closer to the port than those that said that they wouldn't. However, as symptom severity increases, distance to port is similar between those who said they would seek care at one of our hospitals and those who said that they wouldnt.
+
+* As severity goes up people are more likely to seek care at one of our hospitals 
+
+* Sex doesnt appear to affect the rate at which people would seek care but severity does
+
+* You are less likely to go to a pharmacy if your case is hypothetically more severe 
+
+* As severity increases in the possible symptoms of diarrhea people of both age groups (over and under 5) are less likely to be brought to the pharmacy and are more likely to be brought to a hospital.
+
+
+# FIDDLING AROUND
+
+__________________________________________________________________________________________________
+
+
+```{r echo = FALSE}
+
+#yes_to_ind_diarrhea1_care %>% filter(!ind_edu_school %in% "decline") %>% filter(!is.na(cat_sex)) %>% group_by(ind_edu_school, cat_sex) %>% count(cat_activity_month, cat_sex)
+
+#yes_to_ind_diarrhea1_care %>% filter(!is.na(ind_fuel)) %>% group_by(ind_fuel, cat_sex) %>% count(cat_activity_month)
+
+#yes_to_ind_diarrhea1_care %>% select(c(cat_activity_month, cat_sex, n_age)) %>% pivot_wider(names_from = cat_activity_month, values_from = n_age) 
+
+
+#count(mod1_mergedata_rounds_1ab, cat_diarrhea1_site)
+ 
+
+
+
+```
+
+
+
+# NOTES
+
+__________________________________________________________________________________________________
+
+
+
+
+# QUESTIONS
+
+__________________________________________________________________________________________________
+
+* Why do people with no mode of transport have a higher odds of seeking care when compared to people that do have a mode of transport???
+

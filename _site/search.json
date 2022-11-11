@@ -1,0 +1,37 @@
+[
+  {
+    "objectID": "index.html",
+    "href": "index.html",
+    "title": "Taner Bertuna’s Website",
+    "section": "",
+    "text": "Welcome to Taner Bertuna’s personal website!!\nI am an aspiring epidemiologist with a diverse set of backgrounds and passions. In my personal life I love to sail competitively on the Chesapeake Bay and hike with my partner and my dog."
+  },
+  {
+    "objectID": "about.html",
+    "href": "about.html",
+    "title": "About",
+    "section": "",
+    "text": "I am a current second year master of science (ScM) student studying infectious disease epidemiology at the Johns Hopkins Bloomberg School of Public Health. I previously received a BA in Government with a focus on international relations from Cornell University. While in undergrad, I competed on the Cornell University Sailing Team from 2012 to 2016.\nI am interested in infectious disease modelling and its applications in the fight against vaccine preventable diseases. Having previously volunteered over 200 hrs in clinical settings, interned at the WHO, and worked in project management on the construction of a 50 story skyscraper, I believe that my unique set of experiences have brought me to Johns Hopkins where I have discovered my passion for epidemiology and data science.\nI am currently working for the JHU Department of Epidemiology on a COVID-19, Cholera, and Hepatitis E serologic survey of Chittagong Bangladesh. This work will is also associated with my masters thesis, focused on exploring Cholera related healthcare seeking in the study cohort. I also work at the JHU’s International Vaccine Access Center on several projects related to COVID-19 modeling and COVID-19 vaccine health systems."
+  },
+  {
+    "objectID": "Example_analyisis.html",
+    "href": "Example_analyisis.html",
+    "title": "Example_analysis",
+    "section": "",
+    "text": "head(mtcars)\n\n                   mpg cyl disp  hp drat    wt  qsec vs am gear carb\nMazda RX4         21.0   6  160 110 3.90 2.620 16.46  0  1    4    4\nMazda RX4 Wag     21.0   6  160 110 3.90 2.875 17.02  0  1    4    4\nDatsun 710        22.8   4  108  93 3.85 2.320 18.61  1  1    4    1\nHornet 4 Drive    21.4   6  258 110 3.08 3.215 19.44  1  0    3    1\nHornet Sportabout 18.7   8  360 175 3.15 3.440 17.02  0  0    3    2\nValiant           18.1   6  225 105 2.76 3.460 20.22  1  0    3    1"
+  },
+  {
+    "objectID": "Example_analysis.html",
+    "href": "Example_analysis.html",
+    "title": "Example Analysis",
+    "section": "",
+    "text": "The goal of the analysis is to describe variability in penguin body mass per the palmer penguins data set."
+  },
+  {
+    "objectID": "Example_analysis.html#references",
+    "href": "Example_analysis.html#references",
+    "title": "Example Analysis",
+    "section": "References",
+    "text": "References"
+  }
+]

@@ -1,0 +1,12 @@
+"0","penguins_data %>% 
+  group_by(Species, Sex) %>%
+  filter(!is.na(`Body Mass (lbs)`)) %>%
+  filter(!is.na(Sex)) %>%
+  summarize(mean_mass = mean(`Body Mass (lbs)`)) %>%
+  ggplot(aes(x = Sex, y = mean_mass,  fill = Species)) +
+  geom_bar(position=""dodge"", stat=""identity"") + 
+  ylab(""Mean Body Mass in Lbs"") + 
+  ggtitle(""Table 1: Penguin Body Mass by Sex, Broken Down by Species"") + 
+  labs(subtitle = ""Males seem to have higher body masses for all species"")
+"
+"2","`summarise()` has grouped output by 'Species'. You can override using the `.groups` argument."

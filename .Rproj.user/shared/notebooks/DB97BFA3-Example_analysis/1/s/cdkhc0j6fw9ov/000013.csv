@@ -1,0 +1,11 @@
+"0","penguins_data %>%
+  group_by(Island, Species) %>%
+  filter(!is.na(`Body Mass (lbs)`)) %>%
+  summarize(mean_mass = mean(`Body Mass (lbs)`)) %>%
+  ggplot(aes(x = Island, y = mean_mass)) +
+  geom_bar(position=""dodge"", stat=""identity"", fill = ""lightblue"") +  facet_wrap(. ~ Species) + 
+  ylab(""Mean Body Mass in lbs"") + 
+  ggtitle(""Table 3: Penguin Body Mass by Island, Fasceted by Species"") + 
+  labs(subtitle = ""Adelie penguons apprear to be of similar size accross all islands."")
+"
+"2","`summarise()` has grouped output by 'Island'. You can override using the `.groups` argument."
